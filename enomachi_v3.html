@@ -883,23 +883,18 @@ async function resizeImage(file, maxPx=1200) {
   const isHeic = /\.(heic|heif)$/i.test(file.name || '') ||
                  /heic|heif/i.test(file.type || '');
 
-  // ★ HEIC専用: ローカル変換サーバー（localhost:3131）を最初に試す
+  // ★ HEIC専用: heic2anyで直接ブラウザ変換を最初に試す
   if (isHeic) {
-    setText('HEIC変換サーバーに接続中... 🔄');
+    setText('HEIC変換中... ⏳');
     try {
-      const res = await fetch('http://localhost:3131/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: file,
-      });
-      if (!res.ok) throw new Error('server ' + res.status);
-      const jpegBlob = await res.blob();
+      if (typeof heic2any === 'undefined') throw new Error('not loaded');
+      const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.90 });
+      const blob   = Array.isArray(result) ? result[0] : result;
       setText('変換成功！読み込み中... ✅');
-      return await _blobToCanvas(jpegBlob, maxPx);
+      return await _blobToCanvas(blob, maxPx);
     } catch(e) {
-      errs.push('localserver:' + (e.message || String(e)));
+      errs.push('heic2any-first:' + (e.message || String(e)));
       setText('処理中やで...✂️');
-      // サーバーが起動していない場合は通常の方法にフォールバック
     }
   }
 
@@ -930,22 +925,21 @@ async function resizeImage(file, maxPx=1200) {
   try { return await _imageDecoderToCanvas(file, maxPx); }
   catch(e) { errs.push('decoder:'+e.message); }
 
-  // ⑥ heic2any（JavaScript デコーダ）
+  // ⑥ heic2any（JavaScript デコーダ）再試行
   try {
     if (typeof heic2any === 'undefined') throw new Error('not loaded');
-    const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.90 });
+    const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
     const blob   = Array.isArray(result) ? result[0] : result;
     return await _blobToCanvas(blob, maxPx);
   } catch(e) { errs.push('heic2any:'+e.message); }
 
-  // HEIC ファイルでサーバーが使えなかった場合は専用メッセージ
-  if (isHeic && errs.some(e => e.startsWith('localserver'))) {
-    console.error('全手段失敗:', errs.join(' / '));
+  // HEIC ファイルで全手段失敗した場合
+  if (isHeic) {
+    console.error('HEIC全手段失敗:', errs.join(' / '));
     throw new Error(
-      '📱 HEICファイルを読み込むには\n' +
-      'ターミナルで以下を実行してください:\n\n' +
-      '  python3 heic_server.py\n\n' +
-      'サーバーが起動したらもう一度お試しください。\n' +
+      '📱 HEICファイルの変換に失敗しました。\n\n' +
+      'iPhoneの設定で写真形式を「互換性優先」に変更するか、\n' +
+      'JPEGやPNGに変換してからアップしてください。\n' +
       '(詳細: ' + errs.join(', ') + ')'
     );
   }
