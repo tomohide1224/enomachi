@@ -1,0 +1,1915 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>えのまち v3 - テンプレート対応</title>
+  <!-- HEIC→JPEG変換ライブラリ（バックアップ用） -->
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <!-- Supabase JS クライアント -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#000; overflow:hidden; }
+    #screen { width:100vw; height:100vh; position:relative; }
+    #bgCanvas  { position:absolute; inset:0; width:100%; height:100%; }
+    #charCanvas{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+    /* ===== ボタン ===== */
+    #addBtn {
+      position:absolute; bottom:20px; right:20px;
+      background:rgba(255,255,255,0.92); border:none; border-radius:50px;
+      padding:12px 24px; font-size:16px; font-weight:bold; color:#555;
+      cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,0.2); z-index:100;
+      transition:transform 0.15s;
+    }
+    #addBtn:hover { transform:scale(1.05); }
+    #fileInput { display:none; }
+
+    /* ===== 設定ボタン＆パネル ===== */
+    #settingsBtn {
+      position:absolute; bottom:20px; left:20px;
+      background:rgba(255,255,255,0.92); border:none; border-radius:50px;
+      padding:12px 20px; font-size:16px; font-weight:bold; color:#555;
+      cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,0.2); z-index:100;
+      transition:transform 0.15s; display:flex; align-items:center; gap:8px;
+    }
+    #settingsBtn:hover { transform:scale(1.05); }
+    #settingsPanel {
+      display:none; position:absolute; bottom:70px; left:20px;
+      background:rgba(255,255,255,0.96); border-radius:16px;
+      padding:18px 20px; z-index:100;
+      box-shadow:0 4px 20px rgba(0,0,0,0.18);
+      min-width:220px; flex-direction:column; gap:12px;
+    }
+    #settingsPanel.open { display:flex; }
+    #settingsPanel h3 {
+      font-size:13px; color:#777; font-weight:bold; margin:0;
+      letter-spacing:0.05em;
+    }
+    #countdown {
+      font-size:28px; font-weight:900; color:#334; text-align:center;
+      letter-spacing:0.05em;
+    }
+    #intervalRow {
+      display:flex; align-items:center; gap:8px;
+      font-size:13px; color:#555;
+    }
+    #intervalInput {
+      width:52px; padding:6px 8px; border:1.5px solid #ccc;
+      border-radius:8px; font-size:15px; font-weight:bold;
+      text-align:center; color:#334;
+    }
+    #intervalSaveBtn {
+      margin-top:4px; padding:8px; border:none; border-radius:10px;
+      background:#334a7c; color:#fff; font-size:13px; font-weight:bold;
+      cursor:pointer; transition:background 0.15s;
+    }
+    #intervalSaveBtn:hover { background:#1a2f5a; }
+
+    /* ===== ローディング ===== */
+    #loadingOverlay {
+      display:none; position:absolute; inset:0;
+      background:rgba(0,0,0,0.55); z-index:200;
+      align-items:center; justify-content:center; flex-direction:column;
+      gap:14px; color:white; font-size:17px; font-weight:bold;
+    }
+    #loadingOverlay.show { display:flex; }
+    .spinner {
+      width:48px; height:48px;
+      border:5px solid rgba(255,255,255,0.3);
+      border-top-color:white; border-radius:50%;
+      animation:spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ===== デバッグ表示 ===== */
+    #debugInfo {
+      position:absolute; bottom:70px; right:20px;
+      background:rgba(0,0,0,0.6); color:#0f0;
+      font:11px monospace; padding:6px 10px; border-radius:6px;
+      z-index:100; display:none;
+    }
+
+    /* ===== オープニング動画オーバーレイ ===== */
+    #openingOverlay {
+      position:fixed; inset:0; z-index:999;
+      background:#000;
+      display:flex; align-items:center; justify-content:center;
+      transition:opacity 0.8s ease;
+    }
+    #openingOverlay.fadeout { opacity:0; pointer-events:none; }
+    #openingVideo {
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      object-fit:cover;
+      display:none;
+    }
+    /* タップしてはじめる スタート画面 */
+    #startScreen {
+      position:absolute; inset:0;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:28px;
+      cursor:pointer;
+      background: radial-gradient(ellipse at center, #1a3a5c 0%, #000 100%);
+    }
+    #startTitle {
+      font-size:clamp(36px,8vw,80px); font-weight:900;
+      color:#fff; letter-spacing:0.12em;
+      text-shadow: 0 0 40px rgba(120,180,255,0.7);
+    }
+    #startBtn {
+      width:90px; height:90px; border-radius:50%;
+      background:rgba(255,255,255,0.15);
+      border:3px solid rgba(255,255,255,0.6);
+      display:flex; align-items:center; justify-content:center;
+      font-size:40px;
+      animation: pulsebtn 1.8s ease-in-out infinite;
+    }
+    @keyframes pulsebtn {
+      0%,100%{ transform:scale(1);   box-shadow:0 0 0   rgba(255,255,255,0.4); }
+      50%    { transform:scale(1.1); box-shadow:0 0 30px rgba(255,255,255,0.4); }
+    }
+    #startSub {
+      color:rgba(255,255,255,0.55); font-size:15px; letter-spacing:0.1em;
+    }
+    /* 動画再生中のスキップヒント */
+    #skipHint {
+      position:absolute; bottom:30px; right:30px;
+      color:rgba(255,255,255,0.55); font-size:13px;
+      letter-spacing:0.05em; display:none;
+      animation: blinkHint 2s ease-in-out infinite;
+    }
+    @keyframes blinkHint { 0%,100%{opacity:0.3} 50%{opacity:1} }
+  </style>
+</head>
+<body>
+
+<!-- ===== オープニング動画 ===== -->
+<div id="openingOverlay">
+  <!-- 動画（最初は非表示） -->
+  <video id="openingVideo" src="OpeningMov.mp4"
+         playsinline preload="none">
+  </video>
+  <!-- スタート画面 -->
+  <div id="startScreen">
+    <div id="startTitle">えのまち</div>
+    <div id="startBtn">▶</div>
+    <div id="startSub">タップしてはじめる</div>
+  </div>
+  <div id="skipHint">タップしてスキップ ▶</div>
+</div>
+
+<div id="screen">
+  <canvas id="bgCanvas"></canvas>
+  <canvas id="charCanvas"></canvas>
+
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div id="loadingText">処理中やで...✂️</div>
+  </div>
+
+  <button id="addBtn">🎨 えをついか</button>
+  <input type="file" id="fileInput" accept="image/*" multiple>
+
+
+  <!-- 設定ボタン（左下） -->
+  <button id="settingsBtn">⏱ <span id="countdownSmall">5:00</span></button>
+  <div id="settingsPanel">
+    <h3>オープニング インターバル</h3>
+    <div id="countdown">5:00</div>
+    <div id="intervalRow">
+      <input id="intervalInput" type="number" min="1" max="999" value="3">
+      <span>分ごとに再生</span>
+    </div>
+    <button id="intervalSaveBtn">✓ 設定する</button>
+  </div>
+
+  <div id="debugInfo"></div>
+</div>
+
+<script>
+// ██████████████████████████████████████████████████████
+// ██  えのまち v3  ─  実装済みフィーチャー一覧（デグレート防止用）
+// ██████████████████████████████████████████████████████
+// 【キャラクター】
+//   ✅ テンプレート4点マーカーで自動クロップ（白背景テンプレート対応）
+//   ✅ テンプレートcrop後はそのまま使用（透過不要）
+//   ✅ 骨格アニメーション（walk/run/dance/wave/skip/march/punch/jump/sway/sleep）
+//   ✅ MAX10人：11人目が来たら最古のキャラが「帰るね〜！」吹き出しで退場
+//   ✅ ハードキャップ12人：超えたらleavingキャラを即座に除去（フリーズ防止）
+//   ✅ loop()全体をtry-catchで保護（エラーでアニメが止まらない）←削除禁止
+//   ✅ 退場：手を振りながら（waveアニメ）画面中央下へ透視遠近スケールで歩く
+//   ✅ 動的レイヤ順：前足を後足より上に描画（X字交差防止）
+//   ✅ 2パスレンダリング：全ボディ→全オーバーレイ（名前/吹き出し/ZZZが最前面）
+//   ✅ 名前タグ：足元に表示（save/restoreで保護・空名前は???フォールバック）
+//   ✅ 睡眠アニメ：bodyAngle +π/2（頭が常に右）+ ZZZ（小・中・大）同時ふわふわ
+//   ✅ bodyAngleはif(!overlaysOnly)外で宣言（削除禁止：ZZZ消えバグ＆名前消えバグ防止）
+//   ✅ 会話：移動中キャラ同士が衝突→65%確率でsway+吹き出し（font 20px）
+//   ✅ 衝突後クールダウン100フレーム
+//
+// 【移動・境界】
+//   ✅ 上部20%進入禁止：yMin = -SH*(0.60-scale)（頭=身長分を考慮した正確な境界）←削除禁止
+//      ※ -SH*0.60では「足」だけの制限で頭が飛び出す。身長(scale)を引くことで頭を止める
+//   ✅ 左右・下部の壁反射
+//   ✅ 集合フェーズ中も上部20%境界を適用（gatherTargetブロック内）
+//   ✅ 等質量弾性衝突（速度交換）
+//   ✅ アニメ自動切替：8〜20秒のランダムlifetime（stagger付き）
+//   ✅ コンストラクタでもanimAgeをstagger（削除禁止：10秒フリーズ防止）
+//   ✅ 初期animTypeはsleep除外（登場直後に止まらないように）
+//
+// 【オープニング動画】
+//   ✅ 起動時スタート画面（タップしてはじめる）→ OpeningMov.mp4 再生
+//   ✅ インターバルタイマー（デフォルト3分）で自動再生
+//   ✅ タイマー起動前3秒：キャラが徐々に一列に集合（gatherTarget操舵）
+//   ✅ 集合後2.5秒：「動画がはじまるよーー！」大吹き出し（画面中央やや上）
+//   ✅ 動画終了後：reactivateCharacters()で速度・アニメリセット（stagger付き）
+//   ✅ 二重closeOpening防止（closedフラグ）
+//
+// 【BGM】
+//   ✅ drawing sound.mp3：お絵描き中ループ再生
+//   ✅ 動画再生開始でBGM停止、動画終了でBGM再開
+//
+// 【背景】
+//   ✅ background.png/bg.jpg など自動読み込み（fallback：内蔵の町並みSVG描画）
+// ██████████████████████████████████████████████████████
+
+// ======================================================
+// ===== グローバル状態 =====
+// ======================================================
+// アナウンス状態（動画開始前の「並んで吹き出し」フェーズ）
+let announcementState = null;
+
+// ======================================================
+// ===== オープニング動画制御 ＆ インターバルタイマー（統合）=====
+// ======================================================
+(function initOpeningSystem() {
+  const overlay       = document.getElementById('openingOverlay');
+  const video         = document.getElementById('openingVideo');
+  const startScreen   = document.getElementById('startScreen');
+  const skipHint      = document.getElementById('skipHint');
+  const settingsBtn   = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const intervalInput = document.getElementById('intervalInput');
+  const saveBtn       = document.getElementById('intervalSaveBtn');
+  const countdownEl   = document.getElementById('countdown');
+  const countdownSmall= document.getElementById('countdownSmall');
+
+  let intervalMin   = 3;
+  let remainingSec  = intervalMin * 60;
+  let countdownTimer= null;
+
+  // ─── BGM（お絵描き中はリピート再生、動画中は停止）───
+  const bgMusic = new Audio('drawing sound.mp3');
+  bgMusic.loop   = true;
+  bgMusic.volume = 0.6;
+
+  function resumeBgMusic() {
+    if (bgMusic.paused) {
+      bgMusic.play().catch(() => {});  // autoplay blocked は無視
+    }
+  }
+  function pauseBgMusic() {
+    bgMusic.pause();
+  }
+
+  function fmt(sec) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  // ─── キャラクターに動きを再付与するヘルパー ───
+  function reactivateCharacters() {
+    if (typeof characters === 'undefined') return;
+    characters.forEach(c => {
+      if (c.leaving) return;
+      const spd = 2.0 + Math.random() * 1.2;
+      const ang = (Math.random() - 0.5) * 1.0;
+      const sx  = Math.random() < 0.5 ? 1 : -1;
+      c.vx = Math.cos(ang) * spd * sx;
+      c.vy = Math.sin(ang) * spd;
+      c.dir = Math.sign(c.vx);
+      if (typeof ANIM_KEYS !== 'undefined') {
+        // sleep以外のアニメをランダムに選ぶ
+        const movable = ANIM_KEYS.filter(k => k !== 'sleep');
+        c.animType = movable[Math.floor(Math.random() * movable.length)];
+      }
+      // ★ 全員同時にアニメ切り替えを迎えないようにばらつかせる
+      c.animLifetime = (8 + Math.random() * 12) * 60;
+      c.animAge      = Math.floor(Math.random() * c.animLifetime * 0.6);
+      c.chatState.active  = false;
+      c.chatState.cooldown = 0;
+    });
+  }
+
+  // ─── オーバーレイを閉じる → タイマー再スタート ───
+  function closeOpening() {
+    // ★ インラインの opacity を必ずクリアしてからクラスで fade させる
+    overlay.style.opacity = '';
+    overlay.classList.add('fadeout');
+
+    // transitionend が何らかの理由で発火しない場合のフォールバック
+    let closed = false;  // 二重呼び出し防止
+    const fallback = setTimeout(finishClose, 1100);
+    overlay.addEventListener('transitionend', () => {
+      clearTimeout(fallback);
+      finishClose();
+    }, { once: true });
+
+    function finishClose() {
+      if (closed) return;
+      closed = true;
+      overlay.style.display = 'none';
+      video.pause();
+      try { reactivateCharacters(); } catch(e) { console.warn('reactivate:', e); }
+      resumeBgMusic();  // ★ お絵描き再開でBGMも再開
+      resetTimer();
+    }
+  }
+
+  // ─── 動画再生（スタート画面通過後 / タイマートリガー後）───
+  function playVideo() {
+    pauseBgMusic();  // ★ 動画中はBGMを止める
+    startScreen.style.display = 'none';
+    video.style.display  = 'block';
+    skipHint.style.display = 'block';
+    video.currentTime = 0;
+    video.play().catch(closeOpening);
+  }
+
+  // ─── タイマーによる自動再生 ───
+  function triggerOpening() {
+    // ★ インターバルを即停止（二重発火防止）
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+
+    const chars = typeof characters !== 'undefined' ? characters : [];
+    const SW = window.innerWidth;
+    const n = chars.length;
+
+    // ── Phase 1（今すぐ）：集合ターゲットをセット → 3秒かけてゆっくり集まる ──
+    if (n > 0) {
+      chars.forEach((c, idx) => {
+        const tx = n === 1 ? SW / 2 : SW * 0.10 + (SW * 0.80) * idx / (n - 1);
+        c.gatherTarget = { x: tx, y: 0 };
+        c.leaving = false;
+        if (c.chatState) { c.chatState.active = false; c.chatState.cooldown = 0; }
+      });
+    }
+
+    // ── Phase 2（3秒後）：吹き出し表示・全員waveに固定 ──
+    setTimeout(() => {
+      if (n > 0) {
+        chars.forEach((c, idx) => {
+          c.gatherTarget = null;          // 集合完了
+          c.x = n === 1 ? SW / 2 : SW * 0.10 + (SW * 0.80) * idx / (n - 1);
+          c.y = 0;
+          c.vx = 0; c.vy = 0;
+          c.animType = 'wave';
+          c.t = (idx / Math.max(n, 1)) * Math.PI * 2;
+          c.dir = 1;
+        });
+      }
+      announcementState = { active: true, age: 0 };
+
+      // ── Phase 3（さらに2.5秒後）：動画再生 ──
+      setTimeout(() => {
+        announcementState = null;
+        try { reactivateCharacters(); } catch(e) { console.warn('reactivate:', e); }
+        overlay.classList.remove('fadeout');
+        overlay.style.opacity = '';
+        overlay.style.display = 'flex';
+        playVideo();
+      }, 2500);
+    }, 3000);
+  }
+
+  // ─── イベント登録（1回だけ・重複なし）───
+  startScreen.addEventListener('click', playVideo);
+  video.addEventListener('ended',  closeOpening);   // ★ 終了 → closeOpening で戻る
+  video.addEventListener('click',  closeOpening);
+  skipHint.addEventListener('click', closeOpening);
+  // video.addEventListener('error', closeOpening); // 動画ファイルがない場合にオープニングが消えるのを防ぐため無効化
+
+  // ─── カウントダウンタイマー ───
+  function tick() {
+    remainingSec--;
+    countdownEl.textContent     = fmt(remainingSec);
+    countdownSmall.textContent  = fmt(remainingSec);
+    if (remainingSec <= 0) {
+      clearInterval(countdownTimer); countdownTimer = null;
+      triggerOpening();
+    }
+  }
+  function startTimer() {
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = setInterval(tick, 1000);
+  }
+  function resetTimer() {
+    remainingSec = intervalMin * 60;
+    countdownEl.textContent     = fmt(remainingSec);
+    countdownSmall.textContent  = fmt(remainingSec);
+    startTimer();
+  }
+
+  // ─── 設定パネル ───
+  settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsPanel.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!settingsPanel.contains(e.target) && e.target !== settingsBtn)
+      settingsPanel.classList.remove('open');
+  });
+  saveBtn.addEventListener('click', () => {
+    const v = parseInt(intervalInput.value);
+    if (v >= 1) { intervalMin = v; resetTimer(); settingsPanel.classList.remove('open'); }
+  });
+
+  // 起動
+  resetTimer();
+})();
+
+// ======================================================
+// ===== 設定（remove.bgフォールバック用）=====
+// ======================================================
+const SUPABASE_URL   = 'https://xcrancxreztiapactveo.supabase.co';
+const FUNCTION_NAME  = 'remove-bg';
+const SUPABASE_ANON  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhjcmFuY3hyZXp0aWFwYWN0dmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzODc2ODUsImV4cCI6MjA5MDk2MzY4NX0.Jc9dV_Z4ADQoITuejBghQWhBXFRH-RDAww0EGAlkLbo';
+
+// ======================================================
+// ===== テンプレートのパーツ座標（固定）=====
+// クロップ後の画像（マーカー間の内側エリア）に対する割合
+// enomachi_template.pdf の点線位置に合わせた値
+// ======================================================
+// フォーマット座標 (えのまちキャラクターシートに対応)
+// ★ 設計原則（資料OK パターン準拠）:
+//   pivot = 胴体の角（肩/腰）に完全一致
+//   内側延長 = 最大可動域でも角が胴体の外に出ない十分な量を確保
+//
+// 腕：内側延長 ≈ 0.17W → 可動域 ±70° まで安全
+//   leftArm  pivot = (0.00 + 0.50×0.66)W = 0.330W ≈ 胴体左端(0.33W) ✓
+//   rightArm pivot = (0.50 + 0.50×0.32)W = 0.660W ≈ 胴体右端(0.66W) ✓
+//
+// 脚：内側延長 ≈ 0.13H → 可動域 ±58° まで安全
+//   pivot Y = (0.50 + 0.47×0.28)H = 0.632H ≈ 腰(0.63H) ✓
+const FORMAT = {
+  // 頭：sh を 0.28 に延ばして底辺(0.34H)を胴体トップと一致させる
+  head:     { sx:0.30, sy:0.06, sw:0.41, sh:0.28, pvx:0.50, pvy:0.93 },
+  torso:    { sx:0.33, sy:0.34, sw:0.33, sh:0.33, pvx:0.50, pvy:0.00 },
+  leftArm:  { sx:0.00, sy:0.34, sw:0.50, sh:0.12, pvx:0.66, pvy:0.00 },
+  rightArm: { sx:0.50, sy:0.34, sw:0.50, sh:0.12, pvx:0.32, pvy:0.00 },
+  leftLeg:  { sx:0.33, sy:0.50, sw:0.16, sh:0.47, pvx:0.50, pvy:0.28 },
+  rightLeg: { sx:0.50, sy:0.50, sw:0.16, sh:0.47, pvx:0.50, pvy:0.28 },
+};
+// ★ 胴体が手足の上に来るレイヤ順
+// 手足 → 胴体 → 頭 の順に描画（胴体で腕・脚のつなぎ目を隠す）
+const DRAW_ORDER = ['rightLeg','leftLeg','rightArm','leftArm','torso','head'];
+
+// ======================================================
+// ===== アニメーション定義 =====
+// ======================================================
+const D = Math.PI / 180; // degree → radian
+
+const ANIMATIONS = {
+  walk: {
+    tSpeed: 5.0, moveMult: 1.2,
+    fn: (t, d) => ({
+      head: 0, torso: 0,
+      leftArm:   Math.sin(t)*12*D*d,  rightArm: -Math.sin(t)*12*D*d,
+      leftLeg:  -Math.sin(t)*18*D*d,  rightLeg:  Math.sin(t)*18*D*d,
+      bob: Math.abs(Math.sin(t))*2,
+    }),
+  },
+  run: {
+    tSpeed: 9.0, moveMult: 2.5,
+    fn: (t, d) => ({
+      head: 0, torso: 0,
+      leftArm:   Math.sin(t)*25*D*d,  rightArm: -Math.sin(t)*25*D*d,
+      leftLeg:  -Math.sin(t)*32*D*d,  rightLeg:  Math.sin(t)*32*D*d,
+      bob: Math.abs(Math.sin(t))*5,
+    }),
+  },
+  dance: {
+    tSpeed: 6.0, moveMult: 0.4,
+    fn: (t, d) => ({
+      head: Math.sin(t*2)*6*D, torso: 0,
+      leftArm:  -25*D + Math.sin(t*1.5)*18*D,
+      rightArm:  25*D + Math.sin(t*1.5+Math.PI)*18*D,
+      leftLeg:   Math.sin(t*1.5)*14*D*d,
+      rightLeg: -Math.sin(t*1.5)*14*D*d,
+      bob: Math.abs(Math.sin(t*2))*4,
+    }),
+  },
+  wave: {
+    tSpeed: 5.0, moveMult: 0.15,
+    fn: (t, d) => ({
+      head: Math.sin(t*2)*5*D, torso: 0,
+      leftArm:  -38*D + Math.sin(t*3)*16*D,
+      rightArm:  8*D,
+      leftLeg:   Math.sin(t*0.5)*6*D*d,
+      rightLeg: -Math.sin(t*0.5)*6*D*d,
+      bob: 1,
+    }),
+  },
+  skip: {
+    tSpeed: 7.0, moveMult: 1.5,
+    fn: (t, d) => ({
+      head: 0, torso: 0,
+      leftArm:  -14*D + Math.sin(t)*12*D*d,
+      rightArm: -14*D - Math.sin(t)*12*D*d,
+      leftLeg:   Math.sin(t)*24*D*d,
+      rightLeg: -Math.sin(t)*24*D*d,
+      bob: Math.abs(Math.sin(t*2))*7,
+    }),
+  },
+  march: {
+    tSpeed: 5.0, moveMult: 1.1,
+    fn: (t, d) => ({
+      head: 0, torso: 0,
+      leftArm:   Math.sin(t)*16*D*d,  rightArm: -Math.sin(t)*16*D*d,
+      leftLeg:  -Math.sin(t)*32*D*d,  rightLeg:  Math.sin(t)*32*D*d,
+      bob: Math.abs(Math.sin(t))*4,
+    }),
+  },
+  punch: {
+    tSpeed: 5.5, moveMult: 0.6,
+    fn: (t, d) => ({
+      head: 0, torso: 0,
+      leftArm:  -Math.max(0, Math.sin(t))*38*D*d,
+      rightArm:  Math.max(0, Math.sin(t+Math.PI))*38*D*d,
+      leftLeg:   Math.sin(t*0.5)*10*D*d,
+      rightLeg: -Math.sin(t*0.5)*10*D*d,
+      bob: 2,
+    }),
+  },
+  jump: {
+    tSpeed: 7.0, moveMult: 1.4,
+    fn: (t, d) => {
+      // up=1 が空中、up=0 が地面（sin の正の部分だけ使う）
+      const up = Math.max(0, Math.sin(t));
+      return {
+        head: 0, torso: 0,
+        leftArm:  -up * 32*D,   // 空中で両腕を上げる
+        rightArm: -up * 32*D,
+        leftLeg:   up * 22*D,   // 空中で脚を開く
+        rightLeg:  up * 22*D,
+        bob: -up * 65,          // ぴょんと大きく跳ね上がる
+      };
+    },
+  },
+  sway: {
+    tSpeed: 3.5, moveMult: 0.3,
+    fn: (t, d) => ({
+      head: Math.sin(t*0.7)*6*D, torso: 0,
+      leftArm:  -18*D + Math.sin(t)*10*D,
+      rightArm:  18*D - Math.sin(t)*10*D,
+      leftLeg:   Math.sin(t)*7*D,
+      rightLeg: -Math.sin(t)*7*D,
+      bob: Math.abs(Math.sin(t))*2,
+    }),
+  },
+  sleep: {
+    tSpeed: 0.8, moveMult: 0,  // 移動なし
+    fn: (t, d) => ({
+      head:     Math.sin(t)*2*D,  // 頭がかすかに揺れる（呼吸感）
+      torso:    0,
+      leftArm:  88*D,  // 下側の腕（胴体に沿わせる）
+      rightArm: 90*D,  // 上側の腕：胴体にぴったりくっつける
+      leftLeg:  0,     // 両足まっすぐ並行
+      rightLeg: 0,
+      bob: Math.sin(t)*1.5,
+      bodyAngle: Math.PI * 0.5,   // 時計回り→頭が右に来る
+      zzz: true,
+    }),
+  },
+};
+const ANIM_KEYS = Object.keys(ANIMATIONS);
+
+// ======================================================
+// ===== 会話フレーズ =====
+// ======================================================
+const CHAT_PHRASES = [
+  'こんにちは！', 'やあ！元気？', 'どこへ行くの？',
+  'いい天気だね〜', 'また会ったね！', 'ねえねえ！',
+  'おはよう！', 'あそぼう！', 'みてみて！',
+  'わあ！', 'なんか楽しい♪', 'いっしょに行こう！',
+  'おやつ食べた？', 'きょう何するの？', 'すごいでしょ！',
+  'まってまって！', 'えへへ😊', 'ばあ！',
+];
+// 会話トリガー対象のアニメーション（移動中のもの）
+const MOVING_ANIMS = new Set(['walk','run','march','skip','jump']);
+
+// ======================================================
+// ===== ホモグラフィ（透視変換）補正ユーティリティ =====
+// ======================================================
+
+// ガウス消去法で Ax = b を解く
+function gaussElim(A, b) {
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let col = 0; col < n; col++) {
+    let max = col;
+    for (let r = col+1; r < n; r++) if (Math.abs(M[r][col]) > Math.abs(M[max][col])) max = r;
+    [M[col], M[max]] = [M[max], M[col]];
+    for (let r = 0; r < n; r++) {
+      if (r === col || M[col][col] === 0) continue;
+      const f = M[r][col] / M[col][col];
+      for (let j = col; j <= n; j++) M[r][j] -= f * M[col][j];
+    }
+  }
+  return M.map((row, i) => row[n] / row[i]);
+}
+
+// 4点対応からホモグラフィ行列 H（3×3）を計算
+// H は dst→src のマッピング（逆マッピング用）
+function computeHomography(dstPts, srcPts) {
+  const A = [], bv = [];
+  for (let i = 0; i < 4; i++) {
+    const [dx, dy] = [dstPts[i].x, dstPts[i].y];
+    const [sx, sy] = [srcPts[i].x, srcPts[i].y];
+    A.push([dx, dy, 1, 0, 0, 0, -sx*dx, -sx*dy]); bv.push(sx);
+    A.push([0, 0, 0, dx, dy, 1, -sy*dx, -sy*dy]); bv.push(sy);
+  }
+  const h = gaussElim(A, bv);
+  return [[h[0],h[1],h[2]],[h[3],h[4],h[5]],[h[6],h[7],1]];
+}
+
+// ホモグラフィで1点を変換
+function applyH(H, x, y) {
+  const w = H[2][0]*x + H[2][1]*y + H[2][2];
+  return [(H[0][0]*x + H[0][1]*y + H[0][2])/w,
+          (H[1][0]*x + H[1][1]*y + H[1][2])/w];
+}
+
+// 透視変換を適用してCanvasを返す（バイリニア補間）
+function warpPerspective(srcCanvas, srcPts, dstW, dstH) {
+  const dstPts = [{x:0,y:0},{x:dstW,y:0},{x:dstW,y:dstH},{x:0,y:dstH}];
+  const H = computeHomography(dstPts, srcPts);  // dst→src
+
+  const dst = document.createElement('canvas');
+  dst.width = dstW; dst.height = dstH;
+  const dctx = dst.getContext('2d');
+
+  const sW = srcCanvas.width, sH = srcCanvas.height;
+  const sd = srcCanvas.getContext('2d').getImageData(0, 0, sW, sH).data;
+  const di = dctx.createImageData(dstW, dstH);
+  const dd = di.data;
+
+  for (let y = 0; y < dstH; y++) {
+    for (let x = 0; x < dstW; x++) {
+      const [sx, sy] = applyH(H, x, y);
+      const x0 = Math.floor(sx), y0 = Math.floor(sy);
+      if (x0 < 0 || y0 < 0 || x0 >= sW-1 || y0 >= sH-1) continue;
+      const tx = sx - x0, ty = sy - y0;
+      const i00=(y0*sW+x0)*4, i10=i00+4, i01=((y0+1)*sW+x0)*4, i11=i01+4;
+      const di4 = (y*dstW+x)*4;
+      for (let c = 0; c < 4; c++) {
+        dd[di4+c] = sd[i00+c]*(1-tx)*(1-ty) + sd[i10+c]*tx*(1-ty)
+                  + sd[i01+c]*(1-tx)*ty      + sd[i11+c]*tx*ty;
+      }
+    }
+  }
+  dctx.putImageData(di, 0, 0);
+  return dst;
+}
+
+// ======================================================
+// ===== STEP 1: 四隅マーカーを検出 → ホモグラフィ補正 → クロップ =====
+// ======================================================
+function detectAndCrop(imgCanvas) {
+  const W = imgCanvas.width, H = imgCanvas.height;
+  const imageData = imgCanvas.getContext('2d').getImageData(0, 0, W, H);
+  const SR = 0.28;
+
+  const corners = [
+    { name:'tl', x1:0,    y1:0,    x2:SR,  y2:SR  },
+    { name:'tr', x1:1-SR, y1:0,    x2:1,   y2:SR  },
+    { name:'bl', x1:0,    y1:1-SR, x2:SR,  y2:1   },
+    { name:'br', x1:1-SR, y1:1-SR, x2:1,   y2:1   },
+  ];
+
+  const detected = {};
+  for (const c of corners) {
+    const x1=Math.floor(c.x1*W), x2=Math.floor(c.x2*W);
+    const y1=Math.floor(c.y1*H), y2=Math.floor(c.y2*H);
+    let sx=0, sy=0, cnt=0;
+    for (let y=y1; y<y2; y++) {
+      for (let x=x1; x<x2; x++) {
+        const i=(y*W+x)*4;
+        if ((imageData.data[i]+imageData.data[i+1]+imageData.data[i+2])/3 < 70) {
+          sx+=x; sy+=y; cnt++;
+        }
+      }
+    }
+    if (cnt > 30) detected[c.name] = { x:sx/cnt, y:sy/cnt };
+  }
+
+  if (!['tl','tr','bl','br'].every(k => detected[k])) return null;
+
+  const { tl, tr, bl, br } = detected;
+
+  // 出力サイズ = 各辺の平均
+  const dstW = Math.round((Math.hypot(tr.x-tl.x, tr.y-tl.y) + Math.hypot(br.x-bl.x, br.y-bl.y)) / 2);
+  const dstH = Math.round((Math.hypot(bl.x-tl.x, bl.y-tl.y) + Math.hypot(br.x-tr.x, br.y-tr.y)) / 2);
+  if (dstW < 50 || dstH < 50) return null;
+
+  // TL→TR→BR→BL 順で透視補正
+  const srcPts = [tl, tr, br, bl];
+  const warped = warpPerspective(imgCanvas, srcPts, dstW, dstH);
+
+  // マーカー分のパディングをカット（全体の4%）
+  const PAD = Math.round(Math.min(dstW, dstH) * 0.04);
+  const cW = dstW - PAD*2, cH = dstH - PAD*2;
+  const cropped = document.createElement('canvas');
+  cropped.width = cW; cropped.height = cH;
+  cropped.getContext('2d').drawImage(warped, PAD, PAD, cW, cH, 0, 0, cW, cH);
+
+  return { canvas: cropped, method: 'template' };
+}
+
+// ======================================================
+// ===== STEP 2: 白背景を除去して透過PNGにする =====
+// ======================================================
+function removeWhiteBackground(srcCanvas) {
+  const W = srcCanvas.width, H = srcCanvas.height;
+  const dst = document.createElement('canvas');
+  dst.width = W; dst.height = H;
+  const dctx = dst.getContext('2d');
+  dctx.drawImage(srcCanvas, 0, 0);
+  const id = dctx.getImageData(0, 0, W, H);
+  const d  = id.data;
+
+  // まず四隅からフラッドフィルで「紙の色」を取得
+  function sampleColor(x, y) {
+    const i = (y*W+x)*4;
+    return [d[i], d[i+1], d[i+2]];
+  }
+  const samples = [
+    sampleColor(5,5), sampleColor(W-5,5),
+    sampleColor(5,H-5), sampleColor(W-5,H-5),
+  ];
+  const bgR = samples.reduce((s,c)=>s+c[0],0)/4;
+  const bgG = samples.reduce((s,c)=>s+c[1],0)/4;
+  const bgB = samples.reduce((s,c)=>s+c[2],0)/4;
+
+  // BFS フラッドフィル（四隅から背景を検出）
+  const visited = new Uint8Array(W*H);
+  const queue   = [];
+  function enqueue(x,y){
+    if(x<0||y<0||x>=W||y>=H) return;
+    const idx=y*W+x;
+    if(visited[idx]) return;
+    const i=idx*4;
+    const dr=Math.abs(d[i]-bgR), dg=Math.abs(d[i+1]-bgG), db=Math.abs(d[i+2]-bgB);
+    if(dr+dg+db < 90){ visited[idx]=1; queue.push(idx); }
+  }
+  for(let x=0;x<W;x++){enqueue(x,0);enqueue(x,H-1);}
+  for(let y=0;y<H;y++){enqueue(0,y);enqueue(W-1,y);}
+
+  let qi=0;
+  while(qi<queue.length){
+    const idx=queue[qi++];
+    const x=idx%W, y=Math.floor(idx/W);
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy])=>enqueue(x+dx,y+dy));
+  }
+
+  // 背景ピクセルを透明に
+  for(let i=0;i<W*H;i++){
+    if(visited[i]){ d[i*4+3]=0; }
+    else {
+      // 絵の外側に残った薄い色も半透明化
+      const ri=i*4;
+      const bright=(d[ri]+d[ri+1]+d[ri+2])/3;
+      const sat=Math.max(d[ri],d[ri+1],d[ri+2])-Math.min(d[ri],d[ri+1],d[ri+2]);
+      if(bright>200 && sat<25) d[ri+3]=Math.floor((255-bright)*2.5);
+    }
+  }
+  dctx.putImageData(id,0,0);
+  return dst;
+}
+
+// ======================================================
+// ===== STEP 3 (フォールバック): remove.bg API =====
+// ======================================================
+async function removeBackgroundAPI(base64) {
+  const url = `${SUPABASE_URL}/functions/v1/${FUNCTION_NAME}`;
+  const res = await fetch(url, {
+    method:'POST', mode:'cors',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':`Bearer ${SUPABASE_ANON}`,
+      'apikey': SUPABASE_ANON,
+    },
+    body: JSON.stringify({ image_base64: base64 }),
+  });
+  if(!res.ok){ const t=await res.text(); throw new Error(`API ${res.status}: ${t}`); }
+  const data = await res.json();
+  if(data.error) throw new Error(data.error);
+  return data.result_base64;
+}
+
+// ======================================================
+// ===== 画像リサイズ =====
+// ======================================================
+// BlobからCanvasを生成してリサイズ
+function _blobToCanvas(blob, maxPx) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if (w > maxPx || h > maxPx) {
+        if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+        else       { w = Math.round(w * maxPx / h); h = maxPx; }
+      }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load_failed')); };
+    img.src = url;
+  });
+}
+
+// ImageDecoder API (Chrome 94+) でHEICをOSネイティブコーデックで読む
+async function _imageDecoderToCanvas(file, maxPx) {
+  if (typeof ImageDecoder === 'undefined') throw new Error('ImageDecoder not supported');
+
+  // HEICかどうか判定
+  const type = file.type || 'image/heic';
+  const mimeType = /heic|heif/i.test(type) ? 'image/heic' : type;
+
+  // ブラウザがこのコーデックをサポートしているか確認
+  const supported = await ImageDecoder.isTypeSupported(mimeType);
+  if (!supported) throw new Error('HEIC not supported by this browser');
+
+  const decoder = new ImageDecoder({ data: file.stream(), type: mimeType });
+  const { image } = await decoder.decode({ frameIndex: 0 });
+
+  let w = image.displayWidth, h = image.displayHeight;
+  if (w > maxPx || h > maxPx) {
+    if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+    else       { w = Math.round(w * maxPx / h); h = maxPx; }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(image, 0, 0, w, h);
+  image.close();
+  decoder.close();
+  return canvas;
+}
+
+// ImageBitmapをCanvasにスケールして書き込む
+async function _bitmapToCanvas(bitmap, maxPx) {
+  let w = bitmap.width, h = bitmap.height;
+  if (w > maxPx || h > maxPx) {
+    if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+    else       { w = Math.round(w * maxPx / h); h = maxPx; }
+  }
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  return c;
+}
+
+async function resizeImage(file, maxPx=1200) {
+  const setText = t => { const el=document.getElementById('loadingText'); if(el) el.textContent=t; };
+  const errs = [];
+
+  // HEICファイルかどうか判定
+  const isHeic = /\.(heic|heif)$/i.test(file.name || '') ||
+                 /heic|heif/i.test(file.type || '');
+
+  // ★ HEIC専用: ローカル変換サーバー（localhost:3131）を最初に試す
+  if (isHeic) {
+    setText('HEIC変換サーバーに接続中... 🔄');
+    try {
+      const res = await fetch('http://localhost:3131/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: file,
+      });
+      if (!res.ok) throw new Error('server ' + res.status);
+      const jpegBlob = await res.blob();
+      setText('変換成功！読み込み中... ✅');
+      return await _blobToCanvas(jpegBlob, maxPx);
+    } catch(e) {
+      errs.push('localserver:' + (e.message || String(e)));
+      setText('処理中やで...✂️');
+      // サーバーが起動していない場合は通常の方法にフォールバック
+    }
+  }
+
+  // ① createImageBitmap（ChromeのOSネイティブコーデック直通 ← HEIC対応）
+  try {
+    const bm = await createImageBitmap(file);
+    return await _bitmapToCanvas(bm, maxPx);
+  } catch(e) { errs.push('bitmap:'+e.message); }
+
+  // ② MIME type を image/heic に明示して createImageBitmap 再試行
+  try {
+    const bm = await createImageBitmap(new Blob([file], { type:'image/heic' }));
+    return await _bitmapToCanvas(bm, maxPx);
+  } catch(e) { errs.push('bitmap-heic:'+e.message); }
+
+  // ③ MIME type を image/heif で試行
+  try {
+    const bm = await createImageBitmap(new Blob([file], { type:'image/heif' }));
+    return await _bitmapToCanvas(bm, maxPx);
+  } catch(e) { errs.push('bitmap-heif:'+e.message); }
+
+  // ④ 通常の <img> 読み込み
+  try { return await _blobToCanvas(file, maxPx); } catch(e) { errs.push('img:'+e.message); }
+
+  setText('HEIC 変換中... ⏳');
+
+  // ⑤ ImageDecoder API（Chrome 94+）
+  try { return await _imageDecoderToCanvas(file, maxPx); }
+  catch(e) { errs.push('decoder:'+e.message); }
+
+  // ⑥ heic2any（JavaScript デコーダ）
+  try {
+    if (typeof heic2any === 'undefined') throw new Error('not loaded');
+    const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.90 });
+    const blob   = Array.isArray(result) ? result[0] : result;
+    return await _blobToCanvas(blob, maxPx);
+  } catch(e) { errs.push('heic2any:'+e.message); }
+
+  // HEIC ファイルでサーバーが使えなかった場合は専用メッセージ
+  if (isHeic && errs.some(e => e.startsWith('localserver'))) {
+    console.error('全手段失敗:', errs.join(' / '));
+    throw new Error(
+      '📱 HEICファイルを読み込むには\n' +
+      'ターミナルで以下を実行してください:\n\n' +
+      '  python3 heic_server.py\n\n' +
+      'サーバーが起動したらもう一度お試しください。\n' +
+      '(詳細: ' + errs.join(', ') + ')'
+    );
+  }
+
+  console.error('全手段失敗:', errs.join(' / '));
+  throw new Error(
+    '画像を読み込めませんでした: ' + (file.name || '不明') +
+    '\n詳細: ' + errs.join(', ')
+  );
+}
+
+// ======================================================
+// ===== 端フェード（四角い角をなくす）=====
+// ======================================================
+function featherEdges(canvas, fadePx) {
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const id = ctx.getImageData(0, 0, W, H);
+  const d = id.data;
+  const fp = Math.max(2, fadePx);
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      if (d[idx + 3] === 0) continue; // すでに透明はスキップ
+
+      // 四辺からの距離を計算し、一番近い辺との距離でフェード量を決定
+      const dx = Math.min(x, W - 1 - x);
+      const dy = Math.min(y, H - 1 - y);
+      const dist = Math.min(dx, dy);
+
+      if (dist < fp) {
+        // smoothstepで滑らかに
+        const t = dist / fp;
+        const smooth = t * t * (3 - 2 * t);
+        d[idx + 3] = Math.floor(d[idx + 3] * smooth);
+      }
+    }
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+// ======================================================
+// ===== Character クラス =====
+// ======================================================
+class Character {
+  constructor(transparentCanvas, name) {
+    this.name  = name;
+    this.parts = {};
+    this.ready = false;
+    this.imgW  = transparentCanvas.width;
+    this.imgH  = transparentCanvas.height;
+
+    this.t     = Math.random() * Math.PI * 2;
+    this.scale = 0.18 + Math.random() * 0.06;
+    // アニメーションタイプ（ランダム、一定時間で切り替え）
+    // ★ 登場直後はsleep以外からランダムに選ぶ
+    const movableInit = ANIM_KEYS.filter(k => k !== 'sleep');
+    this.animType     = movableInit[Math.floor(Math.random() * movableInit.length)];
+    this.animLifetime = (8 + Math.random() * 12) * 60; // フレーム数（8〜20秒）
+    // ★ stagger：全員同時に切り替えしないようにランダムな位置からスタート
+    this.animAge      = Math.floor(Math.random() * this.animLifetime * 0.7);
+    // 2D速度ベクトル（入射角=反射角の物理）
+    const spd   = 2.0 + Math.random() * 1.2;
+    const ang   = (Math.random() - 0.5) * 1.0; // 水平±約30度
+    const signX = Math.random() < 0.5 ? 1 : -1;
+    this.vx  = Math.cos(ang) * spd * signX;
+    this.vy  = Math.sin(ang) * spd;
+    this.x   = 80 + Math.random() * (window.innerWidth - 160);
+    // yは有効範囲内でランダム初期化（頭が上部20%に入らないよう身長分を引く）
+    // yMin = -SH*(0.60 - scale) : 頭がちょうど20%ラインに来る位置
+    const _initSH = window.innerHeight;
+    const _initYMin = -_initSH * (0.60 - this.scale);
+    this.y   = _initYMin * Math.random();  // 0 〜 yMin の間
+    this.dir = Math.sign(this.vx);
+    // 会話状態（吹き出し管理）
+    this.chatState = { active: false, text: '', age: 0, duration: 0, prevAnim: 'walk', cooldown: 0 };
+    // 退場状態
+    this.leaving   = false;
+    this.leaveAge  = 0;
+    this.leaveDir  = 1;
+
+    this._cutParts(transparentCanvas);
+    this.ready = true;
+  }
+
+  // 退場開始：最寄りの壁に向かって歩き出す
+  startLeaving() {
+    this.leaving  = true;
+    this.leaveAge = 0;
+    this.leaveDir = this.x < window.innerWidth / 2 ? -1 : 1;
+    this.chatState.active  = false;
+    this.chatState.cooldown = 0;
+    this.vx = 0; this.vy = 0;
+  }
+
+  _cutParts(src) {
+    const W = src.width, H = src.height;
+    for(const [name, f] of Object.entries(FORMAT)){
+      const pw=Math.round(f.sw*W), ph=Math.round(f.sh*H);
+      if(pw<1||ph<1) continue;
+      const oc=document.createElement('canvas');
+      oc.width=pw; oc.height=ph;
+      oc.getContext('2d').drawImage(src, Math.round(f.sx*W), Math.round(f.sy*H), pw, ph, 0, 0, pw, ph);
+
+      // ===== パーツ別の形状処理 =====
+      // 楕円クリップ（頭用）
+      function clipEllipse(src) {
+        const tmp = document.createElement('canvas');
+        tmp.width = src.width; tmp.height = src.height;
+        const tctx = tmp.getContext('2d');
+        tctx.beginPath();
+        tctx.ellipse(src.width/2, src.height/2, src.width/2 * 0.93, src.height/2 * 0.93, 0, 0, Math.PI*2);
+        tctx.clip();
+        tctx.drawImage(src, 0, 0);
+        src.getContext('2d').clearRect(0, 0, src.width, src.height);
+        src.getContext('2d').drawImage(tmp, 0, 0);
+      }
+      // 角丸矩形クリップ（腕・脚・胴体用）
+      function clipRoundRect(src, r) {
+        const tmp = document.createElement('canvas');
+        tmp.width = src.width; tmp.height = src.height;
+        const tctx = tmp.getContext('2d');
+        tctx.beginPath();
+        tctx.roundRect(0, 0, src.width, src.height, r);
+        tctx.clip();
+        tctx.drawImage(src, 0, 0);
+        src.getContext('2d').clearRect(0, 0, src.width, src.height);
+        src.getContext('2d').drawImage(tmp, 0, 0);
+      }
+
+      if (name === 'head') {
+        clipEllipse(oc);                          // 頭：楕円
+      } else if (name === 'leftArm' || name === 'rightArm') {
+        clipRoundRect(oc, ph / 2);                // 腕：pill形（短辺の半分で丸め）
+      } else if (name === 'leftLeg' || name === 'rightLeg') {
+        clipRoundRect(oc, pw / 2);                // 脚：pill形（短辺の半分で丸め）
+      } else if (name === 'torso') {
+        clipRoundRect(oc, Math.min(pw,ph) * 0.18);// 胴体：少し角丸
+      }
+
+      this.parts[name]={
+        canvas:oc, w:pw, h:ph,
+        pvWX:(f.sx+f.sw*f.pvx)*W,
+        pvWY:(f.sy+f.sh*f.pvy)*H,
+        ox:f.sx*W, oy:f.sy*H,
+        pvx: f.pvx, pvy: f.pvy,  // 肘・膝計算用に保存
+      };
+    }
+  }
+
+  update(dt) {
+    // ===== アナウンス中は位置固定・waveのみ =====
+    if (announcementState && announcementState.active) {
+      this.animType = 'wave';
+      this.t += dt * ANIMATIONS.wave.tSpeed;
+      return;
+    }
+
+    // ===== 集合フェーズ（動画3秒前からゆっくり集まる）=====
+    if (this.gatherTarget) {
+      const dx = this.gatherTarget.x - this.x;
+      const dy = this.gatherTarget.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 6) {
+        const speed = Math.min(7, dist * 0.07 + 1.5);  // 近いほど減速
+        this.x += (dx / dist) * speed;
+        this.y += (dy / dist) * speed;
+        this.dir = dx > 0 ? 1 : -1;
+        this.animType = dist > 80 ? 'run' : 'walk';
+      } else {
+        // 目標地点に到達
+        this.x = this.gatherTarget.x;
+        this.y = this.gatherTarget.y;
+        this.animType = 'wave';
+      }
+      this.vx = 0; this.vy = 0;
+      this.t += dt * ANIMATIONS[this.animType].tSpeed;
+      // ★ 集合中も上部20%境界を適用（身長分を考慮したyMin）
+      { const _SH = window.innerHeight;
+        const _yMin = -_SH * (0.60 - this.scale);
+        const _yMax =  _SH * 0.10;
+        if (this.y < _yMin) this.y = _yMin;
+        if (this.y > _yMax) this.y = _yMax; }
+      // 左右壁
+      { const _SW = window.innerWidth;
+        if (this.x < 30)       this.x = 30;
+        if (this.x > _SW - 30) this.x = _SW - 30; }
+      return;
+    }
+
+    // ===== 退場処理 =====
+    if (this.leaving) {
+      this.leaveAge++;
+      const SW = window.innerWidth;
+      // ★ 退場中は常にwaveアニメ（手を振りながら帰る）
+      this.animType = 'wave';
+      this.t += dt * ANIMATIONS.wave.tSpeed;
+      if (this.leaveAge < 65) {
+        // Phase1 (~1秒)：その場でバイバイ。画面中心を向く
+        this.dir = this.x < SW / 2 ? 1 : -1;
+      } else {
+        // Phase2：手を振りながら画面中心に向かって手前（下）へ進む
+        const prog  = Math.min(1, (this.leaveAge - 65) / 160);
+        const speed = 2.0 + prog * 4.5;
+        // 横：画面中心へ寄る
+        const dx = SW / 2 - this.x;
+        if (Math.abs(dx) > 6) {
+          this.x += Math.sign(dx) * speed * 0.5;
+          this.dir = Math.sign(dx);
+        }
+        // 縦：手前（下）へ進む（y が増えると groundY に近づき画面下へ）
+        this.y += speed * 1.1;
+      }
+      return;
+    }
+
+    const anim = ANIMATIONS[this.animType];
+    this.t += dt * anim.tSpeed;
+
+    // ===== 会話状態の更新 =====
+    if (this.chatState.cooldown > 0) this.chatState.cooldown--;
+    if (this.chatState.active) {
+      this.chatState.age++;
+      if (this.chatState.age >= this.chatState.duration) {
+        // 会話終了 → 元のアニメに戻してランダム方向に歩き出す
+        this.chatState.active  = false;
+        this.chatState.cooldown = 100; // 約1.7秒は再会話しない
+        this.animType = this.chatState.prevAnim;
+        this.animAge  = 0;
+        const spd = 2.0 + Math.random() * 1.0;
+        const ang = (Math.random() - 0.5) * 0.8;
+        this.vx = Math.cos(ang) * spd * this.dir;
+        this.vy = Math.sin(ang) * spd;
+      }
+      return; // 会話中は移動しない（t は進めておく）
+    }
+
+    // アニメーション切り替えタイマー
+    this.animAge++;
+    if (this.animAge > this.animLifetime) {
+      this.animType     = ANIM_KEYS[Math.floor(Math.random() * ANIM_KEYS.length)];
+      this.animAge      = 0;
+      this.animLifetime = (8 + Math.random() * 12) * 60; // 8〜20秒でばらつかせる
+    }
+
+    // 2D 移動（アニメーション別の速度倍率を適用）
+    this.x += this.vx * anim.moveMult;
+    this.y += this.vy * anim.moveMult;
+
+    const SW = window.innerWidth;
+    const SH = window.innerHeight;
+
+    // 左右の壁で反射
+    if (this.x > SW - 30) { this.x = SW - 30; this.vx = -Math.abs(this.vx); }
+    if (this.x < 30)      { this.x = 30;      this.vx =  Math.abs(this.vx); }
+
+    // 上下の範囲で反射
+    // ★ yMin：頭（身長分を引いた位置）が上部20%ラインを超えないよう計算
+    //   groundY=SH*0.80, 20%ライン=SH*0.20 → 足のyMin = SH*0.20 - SH*0.80 + SH*this.scale
+    //   = -SH*(0.60 - this.scale)
+    const yMax =  SH * 0.10;
+    const yMin = -SH * (0.60 - this.scale);  // ★ 頭が上部20%を超えない境界
+    if (this.y > yMax) { this.y = yMax; this.vy = -Math.abs(this.vy); }
+    if (this.y < yMin) { this.y = yMin; this.vy =  Math.abs(this.vy); }
+
+    if (Math.abs(this.vx) > 0.01) this.dir = Math.sign(this.vx);
+  }
+
+  draw(ctx, screenW, screenH, overlaysOnly = false) {
+    if(!this.ready||!this.parts.head) return;
+    const H=this.imgH, W=this.imgW;
+    // 退場中は奥→手前の遠近効果：だんだん大きくなる
+    const drawScale = (this.leaving && this.leaveAge > 65)
+      ? this.scale * (1 + (this.leaveAge - 65) / 120)
+      : this.scale;
+    const sc=(screenH*drawScale)/H;
+    const groundY=screenH*0.80;
+
+    // アニメーション状態を取得
+    const animState = ANIMATIONS[this.animType].fn(this.t, this.dir);
+    const bob = animState.bob || 0;
+    // ★ 胴体は常に固定（0）。腕・脚は可動域クランプ。
+    // sleep（bodyAngle あり）はクランプ除外（腕 82° を許容するため）
+    const isSleeping = !!(animState.bodyAngle);
+    const ARM_CLAMP = isSleeping ? 88 * D : 38 * D;  // 通常は±38°以内
+    const LEG_CLAMP = isSleeping ? 88 * D : 35 * D;  // 通常は±35°以内
+    const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v));
+    const angles = {
+      head:     animState.head     || 0,
+      torso:    0,  // 胴体は固定
+      leftArm:  clamp(animState.leftArm  || 0, ARM_CLAMP),
+      rightArm: clamp(animState.rightArm || 0, ARM_CLAMP),
+      leftLeg:  clamp(animState.leftLeg  || 0, LEG_CLAMP),
+      rightLeg: clamp(animState.rightLeg || 0, LEG_CLAMP),
+    };
+
+    // sleep 中は頭を常に右向き固定（dir=1）
+    const drawDir = (this.animType === 'sleep') ? 1 : this.dir;
+    // ★ bodyAngleはoverlay(ZZZ)でも使うのでif外に宣言（削除禁止：ZZZ消えバグ防止）
+    const bodyAngle = animState.bodyAngle || 0;
+
+    // ===== キャラクター本体（overlaysOnly=false のときのみ）=====
+    if (!overlaysOnly) {
+    ctx.save();
+    ctx.translate(this.x, groundY + this.y - bob);
+    if(drawDir===-1) ctx.scale(-1,1);
+
+    // 体全体の回転（sleep など）
+    if (bodyAngle !== 0) {
+      const cy = (-H * 0.5) * sc;
+      ctx.translate(0, cy);
+      ctx.rotate(bodyAngle);
+      ctx.translate(0, -cy);
+    }
+
+    // パーツ描画ヘルパー（pivot中心に回転して配置）
+    // 腕・脚はわずかなぼかしを先に描いてつなぎ目を柔らかくする
+    const self = this;
+    function drawPart(pn) {
+      const part = self.parts[pn];
+      if (!part) return;
+      const ang = angles[pn] || 0;
+      const pvX = (part.pvWX - W*0.5)*sc;
+      const pvY = (part.pvWY - H)*sc;
+      const ox  = (part.ox - W*0.5)*sc;
+      const oy  = (part.oy - H)*sc;
+      const pw  = part.w * sc;
+      const ph  = part.h * sc;
+
+      ctx.save();
+      ctx.translate(pvX, pvY);
+      ctx.rotate(ang);
+
+      // 腕・脚はぼかしプレパス→クリアな本描画で関節部を自然に馴染ませる
+      if (pn === 'leftArm' || pn === 'rightArm' || pn === 'leftLeg' || pn === 'rightLeg') {
+        ctx.save();
+        ctx.filter = `blur(${Math.max(1, sc * 4).toFixed(1)}px)`;
+        ctx.drawImage(part.canvas, ox-pvX, oy-pvY, pw, ph);
+        ctx.restore();
+      }
+
+      ctx.drawImage(part.canvas, ox-pvX, oy-pvY, pw, ph);
+      ctx.restore();
+    }
+
+    // ★ 動的レイヤ順：前方の脚を後方の脚より後に描画（X字交差を防止）
+    // leftLeg が負（前方スイング）→ leftLeg を前面に
+    // leftLeg が正（後方スイング）→ rightLeg が前面
+    const leftLegAng = angles.leftLeg;
+    const legFront = leftLegAng <= 0 ? 'leftLeg' : 'rightLeg';
+    const legBack  = leftLegAng <= 0 ? 'rightLeg' : 'leftLeg';
+    const dynamicOrder = [legBack, legFront, 'rightArm', 'leftArm', 'torso', 'head'];
+    for(const pn of dynamicOrder){ drawPart(pn); }
+
+    ctx.restore();  // ← キャラクター変換をここで終了
+    } // end !overlaysOnly
+
+    // ===== オーバーレイ（overlaysOnly=true のときのみ・全キャラ本体の上に描画）=====
+    if (!overlaysOnly) return;
+
+    // 名前タグ（スクリーン座標・大きめ）
+    // ★ save/restoreで保護（前キャラの描画状態を引き継がないよう）
+    {
+      const rawLabel = this.name || '???';  // 空名前フォールバック
+      const label = rawLabel.length>10 ? rawLabel.slice(0,10)+'…' : rawLabel;
+      const footY = groundY + this.y - bob;
+      ctx.save();
+      ctx.font = 'bold 16px sans-serif';
+      const pad = 14, th = 28;
+      const tw  = ctx.measureText(label).width + pad * 2;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath(); ctx.roundRect(this.x - tw/2, footY + 5, tw, th, 12); ctx.fill();
+      ctx.fillStyle = '#333';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, this.x, footY + 5 + th/2);
+      ctx.restore();
+    }
+
+    // ZZZ：頭の上からスクリーン座標で描画（bodyRotation の影響を受けない）
+    if (animState.zzz) {
+      // 頭のトップ中心をスクリーン座標で計算
+      const hImgX = (FORMAT.head.sx + FORMAT.head.sw * 0.5) * W;
+      const hImgY = FORMAT.head.sy * H;
+      let hlx = (hImgX - W * 0.5) * sc;
+      let hly = (hImgY - H) * sc;
+      if (drawDir === -1) hlx = -hlx;  // drawDir を使用（sleep 時は常に 1）
+      if (bodyAngle !== 0) {
+        const cy = (-H * 0.5) * sc;
+        const cosB = Math.cos(bodyAngle), sinB = Math.sin(bodyAngle);
+        const rx = hlx, ry = hly - cy;
+        // Canvas 標準回転公式: x'=x*cos-y*sin, y'=x*sin+y*cos
+        hlx = rx * cosB - ry * sinB;
+        hly = rx * sinB + ry * cosB + cy;
+      }
+      const headSX = this.x + hlx;
+      const headSY = groundY + this.y - bob + hly;
+
+      // ZZZ：3つのZを同時に常時表示（小・中・大）、それぞれ独立してふわふわ浮かぶ
+      const zBase = Math.max(18, sc * H * 0.18);
+      // 各Zの設定: [サイズ倍率, 位相オフセット(rad), X位置倍率, Y位置倍率]
+      const zDefs = [
+        { scale: 0.52, phase: 0.0,  dx: 0.3, dy: 0.5 },  // 小さいZ
+        { scale: 0.75, phase: 1.1,  dx: 1.1, dy: 1.3 },  // 中くらいZ
+        { scale: 1.0,  phase: 2.1,  dx: 2.1, dy: 2.3 },  // 大きいZ（現状サイズ）
+      ];
+      zDefs.forEach(({ scale, phase, dx, dy }) => {
+        const zSize  = Math.round(zBase * scale);
+        const p      = (this.t * 0.45 + phase) % (Math.PI * 2);
+        const alpha  = Math.max(0, Math.sin(p)) * 0.92;
+        const floatY = -Math.sin(p) * zBase * 0.7;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle   = '#3377cc';
+        ctx.font        = `bold ${zSize}px sans-serif`;
+        ctx.textAlign   = 'left';
+        ctx.fillText('Z',
+          headSX + zBase * dx,
+          headSY - zBase * dy + floatY
+        );
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      });
+    }
+
+    // ===== 退場吹き出し「帰るね〜！」（退場中は常に表示・大きめ）=====
+    if (this.leaving) {
+      const bAlpha = Math.min(1, this.leaveAge / 10);
+      if (bAlpha > 0) {
+        const hTopY = groundY + this.y - bob + (FORMAT.head.sy * H - H) * sc;
+        const text  = '帰るね〜！';
+        ctx.save();
+        ctx.globalAlpha = bAlpha;
+        ctx.font = 'bold 22px sans-serif';   // 大きめフォント
+        const pad = 16, th = 40;
+        const tw  = ctx.measureText(text).width + pad * 2;
+        const bx  = this.x - tw / 2;
+        const by  = hTopY - th - 20;
+        // バブル本体
+        ctx.fillStyle   = 'rgba(255,245,200,0.97)';
+        ctx.strokeStyle = '#ddaa33';
+        ctx.lineWidth   = 2.5;
+        ctx.beginPath(); ctx.roundRect(bx, by, tw, th, 12); ctx.fill(); ctx.stroke();
+        // しっぽ
+        ctx.fillStyle = 'rgba(255,245,200,0.97)';
+        ctx.beginPath();
+        ctx.moveTo(this.x-9, by+th-1); ctx.lineTo(this.x, by+th+12); ctx.lineTo(this.x+9, by+th-1);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#ddaa33';
+        ctx.beginPath();
+        ctx.moveTo(this.x-9, by+th); ctx.lineTo(this.x, by+th+12); ctx.lineTo(this.x+9, by+th);
+        ctx.stroke();
+        // テキスト
+        ctx.fillStyle = '#885500';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, this.x, by + th/2);
+        ctx.textBaseline = 'alphabetic';
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+
+    // ===== 会話吹き出し =====
+    if (this.chatState.active) {
+      const { text, age, duration } = this.chatState;
+      // フェードイン(12f)・フェードアウト(12f)
+      const fadeIn  = Math.min(1, age / 12);
+      const fadeOut = Math.min(1, (duration - age) / 12);
+      const bAlpha  = Math.min(fadeIn, fadeOut);
+      if (bAlpha > 0) {
+        // 頭のトップ位置（正立状態）
+        const hTopY = groundY + this.y - bob + (FORMAT.head.sy * H - H) * sc;
+        const hCX   = this.x;
+
+        ctx.save();
+        ctx.globalAlpha = bAlpha;
+        ctx.font = 'bold 20px sans-serif';
+        const pad = 16, th = 40;
+        const tw  = ctx.measureText(text).width + pad * 2;
+        const bx  = hCX - tw / 2;
+        const by  = hTopY - th - 20;
+
+        // バブル本体（丸角矩形）
+        ctx.fillStyle   = 'rgba(255,255,255,0.95)';
+        ctx.strokeStyle = '#88aadd';
+        ctx.lineWidth   = 2.5;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, tw, th, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        // しっぽ（下向き三角）：塗り
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.beginPath();
+        ctx.moveTo(hCX - 9, by + th - 1);
+        ctx.lineTo(hCX,     by + th + 12);
+        ctx.lineTo(hCX + 9, by + th - 1);
+        ctx.closePath();
+        ctx.fill();
+        // しっぽの側面だけ線
+        ctx.strokeStyle = '#88aadd';
+        ctx.beginPath();
+        ctx.moveTo(hCX - 9, by + th);
+        ctx.lineTo(hCX,     by + th + 12);
+        ctx.lineTo(hCX + 9, by + th);
+        ctx.stroke();
+
+        // テキスト
+        ctx.fillStyle  = '#223366';
+        ctx.textAlign  = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, hCX, by + th / 2);
+        ctx.textBaseline = 'alphabetic';
+
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+  }
+}
+
+// ======================================================
+// ===== 背景画像管理 =====
+// ======================================================
+let bgImage = null;  // カスタム背景画像（Imageオブジェクト）
+
+// HTMLと同じフォルダの bg.jpg / bg.png を自動読み込み
+(function autoLoadBg() {
+  const candidates = ['background.png', 'background.jpg', 'bg.jpg', 'bg.jpeg', 'bg.png', 'bg.webp'];
+  let idx = 0;
+  function tryNext() {
+    if (idx >= candidates.length) return;
+    const img = new Image();
+    img.onload = () => { bgImage = img; drawBackground(); };
+    img.onerror = () => { idx++; tryNext(); };
+    img.src = candidates[idx++];
+  }
+  tryNext();
+})();
+
+// ※ オープニング制御・設定パネル・タイマーは上部の initOpeningSystem に統合済み
+
+// ======================================================
+// ===== キャラクター管理 & アニメーションループ =====
+// ======================================================
+const characters=[];
+const charCanvas=document.getElementById('charCanvas');
+const charCtx=charCanvas.getContext('2d');
+
+function resizeCanvases(){
+  const W=window.innerWidth, H=window.innerHeight;
+  document.getElementById('bgCanvas').width=W;
+  document.getElementById('bgCanvas').height=H;
+  charCanvas.width=W; charCanvas.height=H;
+  drawBackground();
+}
+
+let lastTime=0;
+function loop(ts){
+  // ★ try-catch: ループ内エラーで止まらないよう保護
+  try {
+  const dt=Math.min((ts-lastTime)/1000,0.05);
+  lastTime=ts;
+
+  // 全キャラクター更新
+  for(const c of characters){ c.update(dt); }
+
+  // ★ キャラクター同士の衝突判定（等質量弾性衝突・速度増幅なし）
+  const SH = charCanvas.height;
+  for(let i=0; i<characters.length; i++){
+    for(let j=i+1; j<characters.length; j++){
+      const a = characters[i], b = characters[j];
+      const ra = SH * a.scale * 0.28;
+      const rb = SH * b.scale * 0.28;
+      const minDist = ra + rb;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist < minDist && dist > 1){
+        const nx = dx / dist, ny = dy / dist;
+        // めり込み解消（少しずつ・上限付きで累積を防ぐ）
+        const push = Math.min((minDist - dist) * 0.4, 4);
+        a.x -= nx * push; a.y -= ny * push;
+        b.x += nx * push; b.y += ny * push;
+        // ★ push後も上部20%境界を強制クランプ（身長分を考慮・衝突でboundary突破防止）
+        const _aYMin = -SH * (0.60 - a.scale);
+        const _bYMin = -SH * (0.60 - b.scale);
+        if (a.y < _aYMin) { a.y = _aYMin; a.vy = Math.abs(a.vy); }
+        if (b.y < _bYMin) { b.y = _bYMin; b.vy = Math.abs(b.vy); }
+        // 近づいている時だけ反射（法線成分を交換）
+        // ★ 寝ているキャラクターは速度・方向を変えない
+        const aSleep = a.animType === 'sleep';
+        const bSleep = b.animType === 'sleep';
+        const relVn = (a.vx - b.vx)*nx + (a.vy - b.vy)*ny;
+        if(relVn > 0){
+          // ===== 会話トリガー判定 =====
+          // 移動中アニメ同士 & どちらも会話中・クールダウンでない & 65%の確率で会話開始
+          const aCanChat = !aSleep && !a.chatState.active && a.chatState.cooldown===0;
+          const bCanChat = !bSleep && !b.chatState.active && b.chatState.cooldown===0;
+          if(aCanChat && bCanChat &&
+             MOVING_ANIMS.has(a.animType) && MOVING_ANIMS.has(b.animType) &&
+             Math.random() < 0.65) {
+            // 会話テキストを選ぶ（同じにならないよう少し工夫）
+            const idxA = Math.floor(Math.random() * CHAT_PHRASES.length);
+            let idxB = Math.floor(Math.random() * (CHAT_PHRASES.length - 1));
+            if(idxB >= idxA) idxB++;
+            const dur = 150 + Math.floor(Math.random() * 70); // 約2.5〜3.7秒
+            a.chatState = { active:true, text:CHAT_PHRASES[idxA], age:0, duration:dur, prevAnim:a.animType, cooldown:0 };
+            b.chatState = { active:true, text:CHAT_PHRASES[idxB], age:0, duration:dur, prevAnim:b.animType, cooldown:0 };
+            // お互いに向き合う
+            if(a.x < b.x){ a.dir=1; b.dir=-1; } else { a.dir=-1; b.dir=1; }
+            // swayアニメに切り替えて立ち止まる
+            a.animType='sway'; a.animAge=0; a.vx=0; a.vy=0;
+            b.animType='sway'; b.animAge=0; b.vx=0; b.vy=0;
+          } else {
+            // 通常の弾性反射
+            const vna = a.vx*nx + a.vy*ny;
+            const vnb = b.vx*nx + b.vy*ny;
+            if(!aSleep && !a.chatState.active){ a.vx += (vnb-vna)*nx; a.vy += (vnb-vna)*ny; }
+            if(!bSleep && !b.chatState.active){ b.vx += (vna-vnb)*nx; b.vy += (vna-vnb)*ny; }
+            if(!aSleep && !a.chatState.active && Math.abs(a.vx)>0.01) a.dir = Math.sign(a.vx);
+            if(!bSleep && !b.chatState.active && Math.abs(b.vx)>0.01) b.dir = Math.sign(b.vx);
+          }
+        }
+      }
+    }
+  }
+
+  // 画面下(手前)まで歩いた退場キャラを配列から除去
+  const gY = charCanvas.height * 0.80;
+  for(let i=characters.length-1; i>=0; i--){
+    const c=characters[i];
+    if(c.leaving && (gY + c.y) > charCanvas.height + 80){
+      characters.splice(i,1);
+    }
+  }
+
+  charCtx.clearRect(0,0,charCanvas.width,charCanvas.height);
+  // 1パス目：全キャラの本体を描画
+  for(const c of characters){ c.draw(charCtx,charCanvas.width,charCanvas.height,false); }
+  // 2パス目：全キャラのオーバーレイ（名前・吹き出し・ZZZ）を最前面に描画
+  for(const c of characters){ c.draw(charCtx,charCanvas.width,charCanvas.height,true); }
+
+  // ===== アナウンスバブル（動画開始前：大きな共有吹き出し）=====
+  if (announcementState && announcementState.active) {
+    announcementState.age++;
+    const age = announcementState.age;
+    // フェードイン（0〜20f）/ 保持 / フェードアウト（130f〜150f相当）
+    const fadeIn  = Math.min(1, age / 20);
+    const fadeOut = age > 120 ? Math.max(0, 1 - (age - 120) / 20) : 1;
+    const bAlpha  = fadeIn * fadeOut;
+
+    if (bAlpha > 0) {
+      const CW = charCanvas.width, CH = charCanvas.height;
+      const text = '動画がはじまるよーー！';
+      charCtx.save();
+      charCtx.globalAlpha = bAlpha;
+
+      // フォントとバブルサイズ
+      const fontSize = Math.max(28, Math.round(CW * 0.045));
+      charCtx.font = `bold ${fontSize}px sans-serif`;
+      const pad = Math.round(fontSize * 0.75);
+      const th  = Math.round(fontSize * 1.8);
+      const tw  = charCtx.measureText(text).width + pad * 2;
+      const bx  = (CW - tw) / 2;
+      const by  = CH * 0.32;   // 画面中央より少し上
+      const tailX = CW / 2;
+
+      // バブル本体（大きめ角丸）
+      charCtx.fillStyle   = 'rgba(255,248,180,0.97)';
+      charCtx.strokeStyle = '#dd9900';
+      charCtx.lineWidth   = 3.5;
+      charCtx.beginPath();
+      charCtx.roundRect(bx, by, tw, th, Math.round(th * 0.3));
+      charCtx.fill();
+      charCtx.stroke();
+
+      // しっぽ（下向き太め三角）：塗り
+      const tailW = Math.round(th * 0.28);
+      const tailH = Math.round(th * 0.32);
+      charCtx.fillStyle = 'rgba(255,248,180,0.97)';
+      charCtx.beginPath();
+      charCtx.moveTo(tailX - tailW, by + th - 1);
+      charCtx.lineTo(tailX,          by + th + tailH);
+      charCtx.lineTo(tailX + tailW, by + th - 1);
+      charCtx.closePath();
+      charCtx.fill();
+      // しっぽの側面線
+      charCtx.strokeStyle = '#dd9900';
+      charCtx.lineWidth   = 3.5;
+      charCtx.beginPath();
+      charCtx.moveTo(tailX - tailW, by + th);
+      charCtx.lineTo(tailX,          by + th + tailH);
+      charCtx.lineTo(tailX + tailW, by + th);
+      charCtx.stroke();
+
+      // テキスト
+      charCtx.fillStyle    = '#663300';
+      charCtx.textAlign    = 'center';
+      charCtx.textBaseline = 'middle';
+      charCtx.fillText(text, CW / 2, by + th / 2);
+      charCtx.textBaseline = 'alphabetic';
+      charCtx.globalAlpha  = 1;
+      charCtx.restore();
+    }
+  }
+
+  } catch(e) {
+    // ループ内エラーをキャッチ → アニメを止めずに続行
+    console.warn('loop error:', e);
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ======================================================
+// ===== メイン処理：キャラクター追加（共通ヘルパー）=====
+// ======================================================
+
+// ★ 読み込み済みファイル名を管理（重複ロード防止）
+const loadedCharacterNames = new Set();
+
+// 1ファイルをキャラクターとして処理する共通関数
+async function processCharacterFile(file, silent = false) {
+  // ファイル名から拡張子を除去し、Base64URLエンコードされた名前をデコード
+  // 形式: {base64url_name}_{timestamp}.{ext}
+  const rawName = file.name.replace(/\.[^.]+$/, '');  // 拡張子除去
+  let name = rawName;
+  try {
+    const lastUnder = rawName.lastIndexOf('_');
+    if (lastUnder > 0) {
+      const encoded = rawName.substring(0, lastUnder);
+      // Base64URL → Base64 → デコード
+      const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      const decoded = decodeURIComponent(atob(b64));
+      if (decoded) name = decoded;
+    }
+  } catch(e) {
+    // デコード失敗時はrawNameをそのまま使用
+    name = rawName;
+  }
+  const loading    = document.getElementById('loadingOverlay');
+  const loadingText= document.getElementById('loadingText');
+  const debugInfo  = document.getElementById('debugInfo');
+
+  if (!silent) loading.classList.add('show');
+
+  try {
+    if (!silent) loadingText.textContent = `${name} を読み込み中...`;
+    const imgCanvas = await resizeImage(file, 1400);
+
+    if (!silent) loadingText.textContent = `マーカーを検出中...🔍`;
+    const cropResult = detectAndCrop(imgCanvas);
+
+    // テンプレート未検出 → エラーとして返却（APIフォールバックなし）
+    if (!cropResult) {
+      if (!silent) {
+        alert(`❌ ${name}\n四隅のマーカーを認識できませんでした。\n四隅の■が全部写るように撮り直してください。`);
+      } else {
+        console.warn(`マーカー未検出: ${name}`);
+      }
+      return;  // キャラ追加せず終了
+    }
+
+    if (!silent) loadingText.textContent = `テンプレート検出！パーツを切り出し中... ✂️`;
+    const transparentCanvas = cropResult.canvas;
+    if (!silent) {
+      debugInfo.textContent = '✅ テンプレート検出';
+      debugInfo.style.display = 'block';
+      setTimeout(() => debugInfo.style.display = 'none', 3000);
+    }
+
+    characters.push(new Character(transparentCanvas, name));
+    loadedCharacterNames.add(file.name);  // ★ 読み込み済みとして登録
+
+    if (characters.length > 10) {
+      const oldest = characters.find(c => !c.leaving);
+      if (oldest) oldest.startLeaving();
+    }
+    while (characters.length > 12) {
+      const leavingIdx = characters.findIndex(c => c.leaving);
+      if (leavingIdx >= 0) characters.splice(leavingIdx, 1);
+      else characters.shift();
+    }
+  } catch(err) {
+    console.error('processCharacterFile:', err);
+    if (!silent) {
+      const msg = (err instanceof Error) ? err.message : String(err);
+      alert(`${name} の処理でエラー：${msg}`);
+    }
+  } finally {
+    if (!silent) loading.classList.remove('show');
+  }
+}
+
+// ======================================================
+// ===== Supabase設定 =====
+// ======================================================
+// SUPABASE_URLは上部（remove-bg設定）で宣言済みのため再利用
+const SUPABASE_KEY    = 'sb_publishable_X82W_W9Ib7C6Xua27N1Z0A_vw1FKztj';
+const SUPABASE_BUCKET = 'characters';
+
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ======================================================
+// ===== 自動ロード：Supabase Storage を監視（起動時 + 3秒ごと）=====
+// ======================================================
+(function startCharacterWatcher() {
+  const POLL_INTERVAL = 3000; // 3秒ごとにチェック
+  const IMAGE_EXTS    = new Set(['jpg','jpeg','png','webp','heic','heif']);
+
+  async function checkForNewCharacters() {
+    try {
+      // Supabase Storageのファイル一覧を取得（古い順）
+      const { data: files, error } = await sbClient.storage
+        .from(SUPABASE_BUCKET)
+        .list('', { sortBy: { column: 'created_at', order: 'asc' } });
+
+      if (error || !files) return;
+
+      // 画像ファイルだけ抽出（HTMLなどを除外）
+      const imageFiles = files.filter(f => {
+        const ext = f.name.split('.').pop().toLowerCase();
+        return IMAGE_EXTS.has(ext);
+      });
+
+      // まだ読み込んでいないファイルを抽出
+      const newFiles = imageFiles.filter(f => !loadedCharacterNames.has(f.name));
+      if (newFiles.length === 0) return;
+
+      // 新しいファイルを1つずつフェッチしてキャラとして追加
+      for (const f of newFiles) {
+        try {
+          const { data: urlData } = sbClient.storage
+            .from(SUPABASE_BUCKET)
+            .getPublicUrl(f.name);
+
+          const imgRes = await fetch(urlData.publicUrl);
+          if (!imgRes.ok) continue;
+          const blob = await imgRes.blob();
+          const file = new File([blob], f.name, { type: blob.type });
+          await processCharacterFile(file, true);  // silent=true
+          console.log(`✅ Supabaseから自動追加: ${f.name}`);
+        } catch(e) {
+          console.warn(`⚠️ 自動追加失敗: ${f.name}`, e);
+        }
+      }
+    } catch(e) {
+      // エラーは静かにスキップ
+    }
+  }
+
+  // 起動時に即実行
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(checkForNewCharacters, 500);
+  });
+
+  // 3秒ごとにポーリング
+  setInterval(checkForNewCharacters, POLL_INTERVAL);
+})();
+
+// ======================================================
+// ===== 手動追加ボタン =====
+// ======================================================
+document.getElementById('addBtn').onclick = () => document.getElementById('fileInput').click();
+
+
+document.getElementById('fileInput').onchange = async(e) => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  for (const file of files) {
+    await processCharacterFile(file, false);
+  }
+  e.target.value = '';
+};
+
+// ======================================================
+// ===== 背景描画（町並み）=====
+// ======================================================
+function shadeColor(c,p){
+  const n=parseInt(c.replace('#',''),16);
+  return `rgb(${Math.min(255,Math.max(0,(n>>16)+p))},${Math.min(255,Math.max(0,((n>>8)&255)+p))},${Math.min(255,Math.max(0,(n&255)+p))})`;
+}
+
+function drawBackground(){
+  const canvas=document.getElementById('bgCanvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+
+  // カスタム背景画像がある場合はそれを描画して終了
+  if (bgImage) {
+    // アスペクト比を保ちながら画面全体にカバー
+    const scale = Math.max(W / bgImage.width, H / bgImage.height);
+    const dw = bgImage.width * scale;
+    const dh = bgImage.height * scale;
+    const dx = (W - dw) / 2;
+    const dy = (H - dh) / 2;
+    ctx.drawImage(bgImage, dx, dy, dw, dh);
+    return;
+  }
+
+  const sky=ctx.createLinearGradient(0,0,0,H*0.78);
+  sky.addColorStop(0,'#87CEEB'); sky.addColorStop(0.7,'#C8E8FF'); sky.addColorStop(1,'#FFE4B5');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.78);
+
+  [[0.10,0.07,120,38],[0.38,0.04,95,30],[0.62,0.11,145,44],[0.87,0.06,105,32]].forEach(([rx,ry,rw,rh])=>{
+    ctx.fillStyle='rgba(255,255,255,0.82)';
+    [[0,0,0.6,0.5],[-.2,.1,.4,.4],[.25,.05,.38,.38]].forEach(([ox,oy,rx2,ry2])=>{
+      ctx.beginPath(); ctx.ellipse(rx*W+ox*rw,ry*H+oy*rh,rw*rx2,rh*ry2,0,0,Math.PI*2); ctx.fill();
+    });
+  });
+
+  const ground=ctx.createLinearGradient(0,H*0.78,0,H);
+  ground.addColorStop(0,'#7EC850'); ground.addColorStop(1,'#5A9E30');
+  ctx.fillStyle=ground; ctx.fillRect(0,H*0.78,W,H*0.22);
+
+  ctx.fillStyle='#888'; ctx.fillRect(0,H*0.80,W,H*0.20);
+  ctx.fillStyle='#999'; ctx.fillRect(0,H*0.80,W,4);
+  ctx.fillStyle='rgba(255,255,255,0.55)';
+  for(let x=0;x<W;x+=80) ctx.fillRect(x,H*0.895,50,5);
+
+  const buildings=[
+    {x:.01,w:.10,h:.62,c:'#E8C5A0',r:'#C0392B'},{x:.12,w:.08,h:.78,c:'#B8D4E8',r:'#2980B9'},
+    {x:.21,w:.12,h:.52,c:'#F5DEB3',r:'#E67E22'},{x:.34,w:.09,h:.68,c:'#D5E8D4',r:'#27AE60'},
+    {x:.44,w:.12,h:.82,c:'#E8D5E8',r:'#8E44AD'},{x:.57,w:.09,h:.58,c:'#FFE4E1',r:'#E74C3C'},
+    {x:.67,w:.12,h:.72,c:'#E0F0FF',r:'#2C3E50'},{x:.80,w:.10,h:.62,c:'#FFEAA7',r:'#F39C12'},
+    {x:.91,w:.08,h:.75,c:'#DFE6E9',r:'#636E72'},
+  ];
+  buildings.forEach(b=>{
+    const bx=b.x*W,bw=b.w*W,bh=b.h*(H*0.80),by=H*0.80-bh;
+    const bg=ctx.createLinearGradient(bx,by,bx+bw,by);
+    bg.addColorStop(0,b.c); bg.addColorStop(1,shadeColor(b.c,-20));
+    ctx.fillStyle=bg; ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle=b.r;
+    ctx.beginPath(); ctx.moveTo(bx-6,by); ctx.lineTo(bx+bw/2,by-26); ctx.lineTo(bx+bw+6,by); ctx.closePath(); ctx.fill();
+    const cols=Math.max(1,Math.floor(bw/28)),rows=Math.max(1,Math.floor(bh/42));
+    for(let r=0;r<rows-1;r++) for(let c=0;c<cols;c++){
+      const wx=bx+(bw/(cols+1))*(c+1)-7,wy=by+(bh/(rows+1))*(r+1)-7;
+      ctx.fillStyle='#87CEEB'; ctx.fillRect(wx,wy,13,13);
+      ctx.strokeStyle='rgba(0,0,0,0.1)'; ctx.strokeRect(wx,wy,13,13);
+    }
+    const dw=Math.min(bw*0.25,20),dh=dw*1.6;
+    ctx.fillStyle=shadeColor(b.c,-35); ctx.fillRect(bx+(bw-dw)/2,H*0.80-dh,dw,dh);
+  });
+
+  [0.07,0.29,0.52,0.74,0.92].forEach(px=>{
+    const lx=px*W,ly=H*0.80;
+    ctx.strokeStyle='#555'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(lx,ly-H*0.18); ctx.lineTo(lx+18,ly-H*0.18); ctx.stroke();
+    ctx.fillStyle='#FFE566'; ctx.beginPath(); ctx.arc(lx+18,ly-H*0.18,7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,235,100,0.15)'; ctx.beginPath(); ctx.arc(lx+18,ly-H*0.18,18,0,Math.PI*2); ctx.fill();
+  });
+
+  [0.18,0.41,0.63,0.84].forEach(px=>{
+    const tx=px*W,ty=H*0.80;
+    ctx.fillStyle='#8B6914'; ctx.fillRect(tx-4,ty-H*0.12,8,H*0.12);
+    [{x:0,r:20,c:'#4CAF50'},{x:-7,r:14,c:'#66BB6A'},{x:7,r:13,c:'#388E3C'}].forEach(t=>{
+      ctx.fillStyle=t.c; ctx.beginPath(); ctx.arc(tx+t.x,ty-H*0.12-(t.r==20?0:8),t.r,0,Math.PI*2); ctx.fill();
+    });
+  });
+}
+
+window.addEventListener('resize',resizeCanvases);
+resizeCanvases();
+</script>
+</body>
+</html>

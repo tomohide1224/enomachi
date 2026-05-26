@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>えのまち キャラクター登録</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+      background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #ffd89b 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 28px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+    }
+    .title {
+      text-align: center;
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #eee;
+      border-radius: 14px;
+      font-size: 18px;
+      margin-bottom: 22px;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    input[type="text"]:focus { border-color: #ff9a9e; }
+
+    /* 写真エリア */
+    .photo-wrap {
+      position: relative;
+      border: 3px dashed #ddd;
+      border-radius: 20px;
+      padding: 28px 20px;
+      text-align: center;
+      margin-bottom: 22px;
+      cursor: pointer;
+      transition: all 0.2s;
+      overflow: hidden;
+      background: #fafafa;
+    }
+    .photo-wrap:hover, .photo-wrap:active { border-color: #ff9a9e; background: #fff5f5; }
+    .photo-wrap input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+      font-size: 0;
+    }
+    .photo-placeholder .icon { font-size: 52px; display: block; margin-bottom: 10px; }
+    .photo-placeholder .text { color: #bbb; font-size: 14px; line-height: 1.6; }
+    #preview {
+      max-width: 100%;
+      max-height: 240px;
+      border-radius: 12px;
+      display: none;
+    }
+
+    /* ボタン */
+    .btn {
+      width: 100%;
+      padding: 18px;
+      border: none;
+      border-radius: 18px;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      letter-spacing: 0.05em;
+    }
+    .btn-upload {
+      background: linear-gradient(135deg, #ff9a9e 0%, #f093fb 100%);
+      color: white;
+      box-shadow: 0 8px 24px rgba(240, 147, 251, 0.4);
+    }
+    .btn-upload:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .btn-upload:not(:disabled):active { transform: scale(0.97); }
+
+    /* ステータス */
+    .status {
+      text-align: center;
+      padding: 14px 16px;
+      border-radius: 14px;
+      margin-top: 16px;
+      font-size: 15px;
+      font-weight: bold;
+      display: none;
+      line-height: 1.5;
+    }
+    .status.success { background: #e8f5e9; color: #2e7d32; }
+    .status.error   { background: #ffebee; color: #c62828; }
+    .status.loading { background: #e3f2fd; color: #1565c0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">🏘️ えのまち</div>
+    <div class="subtitle">キャラクターをとうろくしてね！</div>
+
+    <label for="nameInput">📛 なまえ（ひらがな・かんじ・なんでもOK）</label>
+    <input type="text" id="nameInput" placeholder="なまえをいれてね" maxlength="20">
+
+    <label>📸 しゃしん</label>
+    <div class="photo-wrap" id="photoWrap">
+      <input type="file" id="fileInput" accept="image/*" capture="environment">
+      <div class="photo-placeholder" id="placeholder">
+        <span class="icon">📷</span>
+        <div class="text">タップして写真を撮るか<br>アルバムから選んでね</div>
+      </div>
+      <img id="preview">
+    </div>
+
+    <button class="btn btn-upload" id="uploadBtn" disabled>
+      🎉 まちにとうじょう！
+    </button>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    // ============================================================
+    // Supabase設定
+    // ============================================================
+    const SUPABASE_URL = 'https://xcrancxreztiapactveo.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_X82W_W9Ib7C6Xua27N1Z0A_vw1FKztj';
+    const BUCKET      = 'characters';
+
+    const { createClient } = window.supabase;
+    const sbClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ============================================================
+    // UI要素
+    // ============================================================
+    const fileInput  = document.getElementById('fileInput');
+    const preview    = document.getElementById('preview');
+    const placeholder= document.getElementById('placeholder');
+    const uploadBtn  = document.getElementById('uploadBtn');
+    const statusEl   = document.getElementById('status');
+    const nameInput  = document.getElementById('nameInput');
+
+    let selectedFile = null;
+
+    // ============================================================
+    // 写真選択
+    // ============================================================
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      selectedFile = file;
+      const url = URL.createObjectURL(file);
+      preview.src = url;
+      preview.style.display = 'block';
+      placeholder.style.display = 'none';
+      uploadBtn.disabled = false;
+    });
+
+    // ============================================================
+    // アップロード
+    // ============================================================
+    uploadBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+
+      const name = nameInput.value.trim() || 'なまえなし';
+      const ts   = Date.now();
+      const ext  = (selectedFile.name.split('.').pop() || 'jpg').toLowerCase();
+      // 日本語名をBase64URLエンコードしてASCII安全なファイル名にする
+      const encodedName = btoa(encodeURIComponent(name))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const fileName = `${encodedName}_${ts}.${ext}`;
+
+      uploadBtn.disabled = true;
+      showStatus('loading', '📤 おくっています...');
+
+      try {
+        const { error } = await sbClient.storage
+          .from(BUCKET)
+          .upload(fileName, selectedFile, {
+            contentType: selectedFile.type || 'image/jpeg',
+            upsert: false
+          });
+
+        if (error) throw error;
+
+        showStatus('success', `✅ ${name} がまちにとうじょうするよ！\nすこし待ってね 🎊`);
+
+        // フォームリセット（3秒後）
+        setTimeout(() => {
+          selectedFile       = null;
+          fileInput.value    = '';
+          preview.src        = '';
+          preview.style.display   = 'none';
+          placeholder.style.display = 'block';
+          nameInput.value    = '';
+          uploadBtn.disabled = true;
+          statusEl.style.display = 'none';
+        }, 3500);
+
+      } catch (err) {
+        console.error('アップロードエラー:', err);
+        showStatus('error', `❌ しっぱいしました\n${err.message || 'もう一度ためしてね'}`);
+        uploadBtn.disabled = false;
+      }
+    });
+
+    function showStatus(type, msg) {
+      statusEl.className   = `status ${type}`;
+      statusEl.textContent = msg;
+      statusEl.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
