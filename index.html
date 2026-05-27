@@ -1898,7 +1898,14 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
           if (!imgRes.ok) { showInfoToast(`❌ 取得失敗: ${f.name}`, 'error'); loadedCharacterNames.add(f.name); continue; }
           const blob = await imgRes.blob();
           const file = new File([blob], f.name, { type: blob.type });
-          await processCharacterFile(file, true);  // silent=true
+
+          // PNGはスタッフ画面で処理済みの透明画像 → テンプレート検出スキップして直接追加
+          const isPng = f.name.toLowerCase().endsWith('.png');
+          if (isPng) {
+            await addProcessedCharacter(file);
+          } else {
+            await processCharacterFile(file, true);  // silent=true（JPEG等：マーカー検出あり）
+          }
           console.log(`✅ Supabaseから自動追加: ${f.name}`);
         } catch(e) {
           showInfoToast(`⚠️ エラー: ${f.name}\n${e.message}`, 'error');
@@ -1918,6 +1925,54 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   // 3秒ごとにポーリング
   setInterval(checkForNewCharacters, POLL_INTERVAL);
 })();
+
+// ======================================================
+// ===== 処理済みPNG（スタッフ画面アップ）を直接キャラ追加 =====
+// ======================================================
+async function addProcessedCharacter(file) {
+  // ファイル名から名前をデコード（processCharacterFileと同じロジック）
+  const rawName = file.name.replace(/\.[^.]+$/, '');
+  let name = rawName;
+  try {
+    const lastUnder = rawName.lastIndexOf('_');
+    if (lastUnder > 0) {
+      const b64 = rawName.substring(0, lastUnder).replace(/-/g, '+').replace(/_/g, '/');
+      const decoded = decodeURIComponent(atob(b64));
+      if (decoded) name = decoded;
+    }
+  } catch(e) { name = rawName; }
+
+  try {
+    // PNGをCanvasに描画
+    const imgCanvas = await new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        c.getContext('2d').drawImage(img, 0, 0);
+        res(c);
+      };
+      img.onerror = rej;
+      img.src = URL.createObjectURL(file);
+    });
+
+    characters.push(new Character(imgCanvas, name));
+    loadedCharacterNames.add(file.name);
+    showInfoToast(`🎉 ${name} が登場！`, 'success');
+
+    if (characters.length > 10) {
+      const oldest = characters.find(c => !c.leaving);
+      if (oldest) oldest.startLeaving();
+    }
+    while (characters.length > 12) {
+      const idx = characters.findIndex(c => c.leaving);
+      if (idx >= 0) characters.splice(idx, 1); else characters.shift();
+    }
+  } catch(err) {
+    showInfoToast(`⚠️ PNG読み込みエラー: ${name}\n${err.message}`, 'error');
+    console.warn('addProcessedCharacter error:', err);
+  }
+}
 
 // ======================================================
 // ===== 手動追加ボタン =====
