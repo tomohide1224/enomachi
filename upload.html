@@ -5,153 +5,154 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>えのまち キャラクター登録</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
-background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #ffd89b 100%);
-min-height: 100vh;
-display: flex;
-align-items: center;
-justify-content: center;
-padding: 20px;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #ffd89b 100%);
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
 }
 .card {
-background: white;
-border-radius: 28px;
-padding: 32px 24px;
-width: 100%;
-max-width: 420px;
-box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+  background: white; border-radius: 28px; padding: 28px 22px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.18);
 }
-.title {
-text-align: center;
-font-size: 28px;
-font-weight: bold;
-margin-bottom: 4px;
-}
-.subtitle {
-text-align: center;
-color: #999;
-font-size: 13px;
-margin-bottom: 28px;
-}
-label {
-display: block;
-font-size: 13px;
-font-weight: bold;
-color: #666;
-margin-bottom: 8px;
-}
+.title { text-align:center; font-size:26px; font-weight:bold; margin-bottom:4px; }
+.subtitle { text-align:center; color:#999; font-size:13px; margin-bottom:22px; }
+label { display:block; font-size:13px; font-weight:bold; color:#666; margin-bottom:8px; }
 input[type="text"] {
-width: 100%;
-padding: 14px 16px;
-border: 2px solid #eee;
-border-radius: 14px;
-font-size: 18px;
-margin-bottom: 22px;
-outline: none;
-transition: border-color 0.2s;
-font-family: inherit;
+  width:100%; padding:14px 16px; border:2px solid #eee; border-radius:14px;
+  font-size:18px; margin-bottom:18px; outline:none; transition:border-color 0.2s; font-family:inherit;
 }
-input[type="text"]:focus { border-color: #ff9a9e; }
+input[type="text"]:focus { border-color:#ff9a9e; }
 
 /* 写真エリア */
 .photo-wrap {
-position: relative;
-border: 3px dashed #ddd;
-border-radius: 20px;
-padding: 28px 20px;
-text-align: center;
-margin-bottom: 22px;
-cursor: pointer;
-transition: all 0.2s;
-overflow: hidden;
-background: #fafafa;
+  position:relative; border:3px dashed #ddd; border-radius:20px;
+  padding:28px 20px; text-align:center; margin-bottom:18px; cursor:pointer;
+  transition:all 0.2s; overflow:hidden; background:#fafafa;
 }
-.photo-wrap:hover, .photo-wrap:active { border-color: #ff9a9e; background: #fff5f5; }
+.photo-wrap:hover, .photo-wrap:active { border-color:#ff9a9e; background:#fff5f5; }
 .photo-wrap input[type="file"] {
-position: absolute;
-inset: 0;
-opacity: 0;
-cursor: pointer;
-width: 100%;
-height: 100%;
-font-size: 0;
+  position:absolute; inset:0; opacity:0; cursor:pointer;
+  width:100%; height:100%; font-size:0;
 }
-.photo-placeholder .icon { font-size: 52px; display: block; margin-bottom: 10px; }
-.photo-placeholder .text { color: #bbb; font-size: 14px; line-height: 1.6; }
-#preview {
-max-width: 100%;
-max-height: 240px;
-border-radius: 12px;
-display: none;
+.photo-placeholder .icon { font-size:48px; display:block; margin-bottom:10px; }
+.photo-placeholder .text { color:#bbb; font-size:14px; line-height:1.6; }
+#thumbImg { max-width:100%; max-height:200px; border-radius:12px; display:none; }
+
+/* ボタン共通 */
+.btn {
+  width:100%; padding:16px; border:none; border-radius:18px;
+  font-size:18px; font-weight:bold; cursor:pointer; transition:all 0.15s;
+  font-family:inherit; letter-spacing:0.05em;
+}
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+.btn:not(:disabled):active { transform:scale(0.97); }
+.btn-primary {
+  background:linear-gradient(135deg, #ff9a9e 0%, #f093fb 100%);
+  color:white; box-shadow:0 8px 24px rgba(240,147,251,0.4);
+  margin-bottom:10px;
+}
+.btn-send {
+  background:linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color:white; box-shadow:0 8px 24px rgba(56,249,215,0.4);
+  margin-bottom:10px;
+}
+.btn-retry {
+  background:#f5f5f5; color:#666; font-size:16px;
+  box-shadow:none; margin-bottom:0;
 }
 
-/* ボタン */
-.btn {
-width: 100%;
-padding: 18px;
-border: none;
-border-radius: 18px;
-font-size: 20px;
-font-weight: bold;
-cursor: pointer;
-transition: all 0.15s;
-font-family: inherit;
-letter-spacing: 0.05em;
+/* ステップ管理 */
+#stepUpload { display:block; }
+#stepPreview { display:none; }
+
+/* プレビューキャンバス */
+#previewWrap {
+  border-radius:16px; overflow:hidden; background:#e8f4e8;
+  margin-bottom:18px; position:relative;
 }
-.btn-upload {
-background: linear-gradient(135deg, #ff9a9e 0%, #f093fb 100%);
-color: white;
-box-shadow: 0 8px 24px rgba(240, 147, 251, 0.4);
+#previewCanvas { display:block; width:100%; height:220px; }
+#previewLabel {
+  position:absolute; bottom:8px; left:50%; transform:translateX(-50%);
+  background:rgba(255,255,255,0.9); border-radius:20px; padding:4px 14px;
+  font-size:13px; font-weight:bold; color:#555;
 }
-.btn-upload:disabled {
-opacity: 0.4;
-cursor: not-allowed;
-box-shadow: none;
+
+/* プロセス中オーバーレイ */
+#processOverlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(255,255,255,0.92); z-index:9999;
+  flex-direction:column; align-items:center; justify-content:center; gap:16px;
 }
-.btn-upload:not(:disabled):active { transform: scale(0.97); }
+#processOverlay.show { display:flex; }
+.spinner {
+  width:48px; height:48px; border:5px solid #f3f3f3;
+  border-top:5px solid #f093fb; border-radius:50%;
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+#processMsg { font-size:16px; font-weight:bold; color:#555; }
 
 /* ステータス */
 .status {
-text-align: center;
-padding: 14px 16px;
-border-radius: 14px;
-margin-top: 16px;
-font-size: 15px;
-font-weight: bold;
-display: none;
-line-height: 1.5;
+  text-align:center; padding:12px 16px; border-radius:14px;
+  margin-top:12px; font-size:14px; font-weight:bold; display:none; line-height:1.5;
 }
-.status.success { background: #e8f5e9; color: #2e7d32; }
-.status.error { background: #ffebee; color: #c62828; }
-.status.loading { background: #e3f2fd; color: #1565c0; }
+.status.success { background:#e8f5e9; color:#2e7d32; }
+.status.error   { background:#ffebee; color:#c62828; }
+.status.loading { background:#e3f2fd; color:#1565c0; }
 </style>
 </head>
 <body>
 <div class="card">
-<div class="title">🏘️ えのまち</div>
-<div class="subtitle">キャラクターをとうろくしてね！</div>
+  <div class="title">🏘️ えのまち</div>
+  <div class="subtitle">キャラクターをとうろくしてね！</div>
 
-<label for="nameInput">📛 なまえ（ひらがな・かんじ・なんでもOK）</label>
-<input type="text" id="nameInput" placeholder="なまえをいれてね" maxlength="20">
+  <!-- STEP 1: アップロード -->
+  <div id="stepUpload">
+    <label for="nameInput">📛 なまえ</label>
+    <input type="text" id="nameInput" placeholder="なまえをいれてね" maxlength="20">
 
-<label>📸 しゃしん</label>
-<div class="photo-wrap" id="photoWrap">
-<input type="file" id="fileInput" accept="image/*">
-<div class="photo-placeholder" id="placeholder">
-<span class="icon">📷</span>
-<div class="text">タップして写真を撮るか<br>アルバムから選んでね</div>
+    <label>📸 しゃしん（テンプレート用紙で撮ってね）</label>
+    <div class="photo-wrap" id="photoWrap">
+      <input type="file" id="fileInput" accept="image/*">
+      <div class="photo-placeholder" id="placeholder">
+        <span class="icon">📷</span>
+        <div class="text">タップして写真を選ぶか<br>撮影してね</div>
+      </div>
+      <img id="thumbImg">
+    </div>
+
+    <button class="btn btn-primary" id="checkBtn" disabled>
+      🔍 キャラクターをチェック！
+    </button>
+    <div class="status" id="uploadStatus"></div>
+  </div>
+
+  <!-- STEP 2: プレビュー確認 -->
+  <div id="stepPreview">
+    <div style="text-align:center; margin-bottom:14px; font-size:15px; font-weight:bold; color:#555;">
+      👇 こんなキャラになったよ！
+    </div>
+    <div id="previewWrap">
+      <canvas id="previewCanvas"></canvas>
+      <div id="previewLabel" id="nameLabel"></div>
+    </div>
+    <button class="btn btn-send" id="sendBtn">🎉 まちに送る！</button>
+    <button class="btn btn-retry" id="retryBtn">↩️ やり直す</button>
+    <div class="status" id="sendStatus"></div>
+  </div>
 </div>
-<img id="preview">
-</div>
 
-<button class="btn btn-upload" id="uploadBtn" disabled>
-🎉 まちにとうじょう！
-</button>
-
-<div class="status" id="status"></div>
+<!-- 処理中オーバーレイ -->
+<div id="processOverlay">
+  <div class="spinner"></div>
+  <div id="processMsg">処理中...</div>
 </div>
 
 <script>
@@ -161,88 +162,506 @@ line-height: 1.5;
 const SUPABASE_URL = 'https://xcrancxreztiapactveo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_X82W_W9Ib7C6Xua27N1Z0A_vw1FKztj';
 const BUCKET = 'characters';
-
 const { createClient } = window.supabase;
 const sbClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ============================================================
-// UI要素
+// FORMAT & ANIMATIONS（えのまちと共通）
 // ============================================================
-const fileInput = document.getElementById('fileInput');
-const preview = document.getElementById('preview');
-const placeholder= document.getElementById('placeholder');
-const uploadBtn = document.getElementById('uploadBtn');
-const statusEl = document.getElementById('status');
-const nameInput = document.getElementById('nameInput');
+const FORMAT = {
+  head:     { sx:0.30, sy:0.06, sw:0.41, sh:0.28, pvx:0.50, pvy:0.93 },
+  torso:    { sx:0.33, sy:0.34, sw:0.33, sh:0.33, pvx:0.50, pvy:0.00 },
+  leftArm:  { sx:0.00, sy:0.34, sw:0.50, sh:0.12, pvx:0.66, pvy:0.00 },
+  rightArm: { sx:0.50, sy:0.34, sw:0.50, sh:0.12, pvx:0.32, pvy:0.00 },
+  leftLeg:  { sx:0.33, sy:0.50, sw:0.16, sh:0.47, pvx:0.50, pvy:0.28 },
+  rightLeg: { sx:0.50, sy:0.50, sw:0.16, sh:0.47, pvx:0.50, pvy:0.28 },
+};
+const D = Math.PI / 180;
+const ANIMATIONS = {
+  walk: { tSpeed:5.0, moveMult:1.0, fn:(t,d)=>({ leftArm:Math.sin(t)*12*D*d, rightArm:-Math.sin(t)*12*D*d, leftLeg:-Math.sin(t)*18*D*d, rightLeg:Math.sin(t)*18*D*d, bob:Math.abs(Math.sin(t))*2 }) },
+  dance: { tSpeed:6.0, moveMult:0.3, fn:(t,d)=>({ head:Math.sin(t*2)*6*D, leftArm:-25*D+Math.sin(t*1.5)*18*D, rightArm:25*D+Math.sin(t*1.5+Math.PI)*18*D, leftLeg:Math.sin(t*1.5)*14*D*d, rightLeg:-Math.sin(t*1.5)*14*D*d, bob:Math.abs(Math.sin(t*2))*4 }) },
+  wave: { tSpeed:5.0, moveMult:0.1, fn:(t,d)=>({ head:Math.sin(t*2)*5*D, leftArm:-38*D+Math.sin(t*3)*16*D, rightArm:8*D, leftLeg:Math.sin(t*0.5)*6*D*d, rightLeg:-Math.sin(t*0.5)*6*D*d, bob:1 }) },
+};
+const ANIM_KEYS = Object.keys(ANIMATIONS);
 
+// ============================================================
+// 画像処理ユーティリティ
+// ============================================================
+function gaussElim(A, b) {
+  const n = b.length;
+  const M = A.map((row,i)=>[...row,b[i]]);
+  for(let col=0;col<n;col++){
+    let max=col;
+    for(let r=col+1;r<n;r++) if(Math.abs(M[r][col])>Math.abs(M[max][col])) max=r;
+    [M[col],M[max]]=[M[max],M[col]];
+    for(let r=0;r<n;r++){
+      if(r===col||M[col][col]===0) continue;
+      const f=M[r][col]/M[col][col];
+      for(let j=col;j<=n;j++) M[r][j]-=f*M[col][j];
+    }
+  }
+  return M.map((row,i)=>row[n]/row[i]);
+}
+function computeHomography(dstPts, srcPts) {
+  const A=[],bv=[];
+  for(let i=0;i<4;i++){
+    const [dx,dy]=[dstPts[i].x,dstPts[i].y];
+    const [sx,sy]=[srcPts[i].x,srcPts[i].y];
+    A.push([dx,dy,1,0,0,0,-sx*dx,-sx*dy]); bv.push(sx);
+    A.push([0,0,0,dx,dy,1,-sy*dx,-sy*dy]); bv.push(sy);
+  }
+  const h=gaussElim(A,bv);
+  return [[h[0],h[1],h[2]],[h[3],h[4],h[5]],[h[6],h[7],1]];
+}
+function applyH(H,x,y){
+  const w=H[2][0]*x+H[2][1]*y+H[2][2];
+  return[(H[0][0]*x+H[0][1]*y+H[0][2])/w,(H[1][0]*x+H[1][1]*y+H[1][2])/w];
+}
+function warpPerspective(srcCanvas, srcPts, dstW, dstH) {
+  const dstPts=[{x:0,y:0},{x:dstW,y:0},{x:dstW,y:dstH},{x:0,y:dstH}];
+  const H=computeHomography(dstPts,srcPts);
+  const dst=document.createElement('canvas'); dst.width=dstW; dst.height=dstH;
+  const dctx=dst.getContext('2d');
+  const sW=srcCanvas.width,sH=srcCanvas.height;
+  const sd=srcCanvas.getContext('2d').getImageData(0,0,sW,sH).data;
+  const di=dctx.createImageData(dstW,dstH); const dd=di.data;
+  for(let y=0;y<dstH;y++) for(let x=0;x<dstW;x++){
+    const [sx,sy]=applyH(H,x,y);
+    const x0=Math.floor(sx),y0=Math.floor(sy);
+    if(x0<0||y0<0||x0>=sW-1||y0>=sH-1) continue;
+    const tx=sx-x0,ty=sy-y0;
+    const i00=(y0*sW+x0)*4,i10=i00+4,i01=((y0+1)*sW+x0)*4,i11=i01+4;
+    const di4=(y*dstW+x)*4;
+    for(let c=0;c<4;c++) dd[di4+c]=sd[i00+c]*(1-tx)*(1-ty)+sd[i10+c]*tx*(1-ty)+sd[i01+c]*(1-tx)*ty+sd[i11+c]*tx*ty;
+  }
+  dctx.putImageData(di,0,0); return dst;
+}
+function detectAndCrop(imgCanvas) {
+  const W=imgCanvas.width,H=imgCanvas.height;
+  const imageData=imgCanvas.getContext('2d').getImageData(0,0,W,H);
+  const SR=0.28;
+  const corners=[{name:'tl',x1:0,y1:0,x2:SR,y2:SR},{name:'tr',x1:1-SR,y1:0,x2:1,y2:SR},{name:'bl',x1:0,y1:1-SR,x2:SR,y2:1},{name:'br',x1:1-SR,y1:1-SR,x2:1,y2:1}];
+  const detected={};
+  for(const c of corners){
+    const x1=Math.floor(c.x1*W),x2=Math.floor(c.x2*W),y1=Math.floor(c.y1*H),y2=Math.floor(c.y2*H);
+    let sx=0,sy=0,cnt=0;
+    for(let y=y1;y<y2;y++) for(let x=x1;x<x2;x++){
+      const i=(y*W+x)*4;
+      if((imageData.data[i]+imageData.data[i+1]+imageData.data[i+2])/3<70){sx+=x;sy+=y;cnt++;}
+    }
+    if(cnt>30) detected[c.name]={x:sx/cnt,y:sy/cnt};
+  }
+  if(!['tl','tr','bl','br'].every(k=>detected[k])) return null;
+  const {tl,tr,bl,br}=detected;
+  const dstW=Math.round((Math.hypot(tr.x-tl.x,tr.y-tl.y)+Math.hypot(br.x-bl.x,br.y-bl.y))/2);
+  const dstH=Math.round((Math.hypot(bl.x-tl.x,bl.y-tl.y)+Math.hypot(br.x-tr.x,br.y-tr.y))/2);
+  if(dstW<50||dstH<50) return null;
+  const warped=warpPerspective(imgCanvas,[tl,tr,br,bl],dstW,dstH);
+  const PAD=Math.round(Math.min(dstW,dstH)*0.04);
+  const cW=dstW-PAD*2,cH=dstH-PAD*2;
+  const cropped=document.createElement('canvas'); cropped.width=cW; cropped.height=cH;
+  cropped.getContext('2d').drawImage(warped,PAD,PAD,cW,cH,0,0,cW,cH);
+  return {canvas:cropped};
+}
+function removeWhiteBackground(srcCanvas) {
+  const W=srcCanvas.width,H=srcCanvas.height;
+  const dst=document.createElement('canvas'); dst.width=W; dst.height=H;
+  const dctx=dst.getContext('2d'); dctx.drawImage(srcCanvas,0,0);
+  const id=dctx.getImageData(0,0,W,H); const d=id.data;
+  function sampleColor(x,y){const i=(y*W+x)*4;return[d[i],d[i+1],d[i+2]];}
+  const samples=[sampleColor(5,5),sampleColor(W-5,5),sampleColor(5,H-5),sampleColor(W-5,H-5)];
+  const bgR=samples.reduce((s,c)=>s+c[0],0)/4,bgG=samples.reduce((s,c)=>s+c[1],0)/4,bgB=samples.reduce((s,c)=>s+c[2],0)/4;
+  const visited=new Uint8Array(W*H); const queue=[];
+  function enqueue(x,y){
+    if(x<0||y<0||x>=W||y>=H) return;
+    const idx=y*W+x; if(visited[idx]) return;
+    const i=idx*4; const dr=Math.abs(d[i]-bgR),dg=Math.abs(d[i+1]-bgG),db=Math.abs(d[i+2]-bgB);
+    if(dr+dg+db<90){visited[idx]=1;queue.push(idx);}
+  }
+  for(let x=0;x<W;x++){enqueue(x,0);enqueue(x,H-1);}
+  for(let y=0;y<H;y++){enqueue(0,y);enqueue(W-1,y);}
+  let qi=0;
+  while(qi<queue.length){const idx=queue[qi++];const x=idx%W,y=Math.floor(idx/W);[[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy])=>enqueue(x+dx,y+dy));}
+  for(let i=0;i<W*H;i++){
+    if(visited[i]){d[i*4+3]=0;}
+    else{const ri=i*4;const bright=(d[ri]+d[ri+1]+d[ri+2])/3,sat=Math.max(d[ri],d[ri+1],d[ri+2])-Math.min(d[ri],d[ri+1],d[ri+2]);if(bright>200&&sat<25)d[ri+3]=Math.floor((255-bright)*2.5);}
+  }
+  dctx.putImageData(id,0,0); return dst;
+}
+
+// HEIC変換
+async function decodeHeicWithLibheif(file, maxPx) {
+  const { HeifDecoder } = await import('https://esm.sh/libheif-js@1.18.2?exports=HeifDecoder');
+  const arrayBuffer = await file.arrayBuffer();
+  const uint8 = new Uint8Array(arrayBuffer);
+  return new Promise((resolve, reject) => {
+    try {
+      const decoder = new HeifDecoder();
+      const images = decoder.decode(uint8);
+      if (!images || images.length === 0) { reject(new Error('no images')); return; }
+      const image = images[0];
+      const origW = image.get_width(), origH = image.get_height();
+      const pixBuf = new Uint8ClampedArray(origW * origH * 4);
+      image.display({ data: pixBuf, width: origW, height: origH }, (displayData) => {
+        if (!displayData) { reject(new Error('display failed')); return; }
+        try {
+          const tempC = document.createElement('canvas');
+          tempC.width = origW; tempC.height = origH;
+          tempC.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(displayData.data.buffer), origW, origH), 0, 0);
+          let w = origW, h = origH;
+          if (maxPx && Math.max(w, h) > maxPx) { const s = maxPx / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+          const out = document.createElement('canvas'); out.width = w; out.height = h;
+          out.getContext('2d').drawImage(tempC, 0, 0, w, h);
+          resolve(out);
+        } catch(e) { reject(e); }
+      });
+    } catch(e) { reject(e); }
+  });
+}
+async function resizeImage(file, maxPx = 1400) {
+  const isHeic = /heic|heif/i.test(file.type || file.name.split('.').pop());
+  const errs = [];
+  if (isHeic) {
+    try { return await decodeHeicWithLibheif(file, maxPx); } catch(e) { errs.push('libheif:'+e.message); }
+    try {
+      if (typeof heic2any !== 'undefined') {
+        const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.90 });
+        const blob = Array.isArray(result) ? result[0] : result;
+        return await new Promise((res, rej) => {
+          const img = new Image(); img.onload = () => {
+            let w = img.width, h = img.height;
+            if (maxPx && Math.max(w, h) > maxPx) { const s = maxPx / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+            const c = document.createElement('canvas'); c.width = w; c.height = h;
+            c.getContext('2d').drawImage(img, 0, 0, w, h); res(c);
+          }; img.onerror = rej; img.src = URL.createObjectURL(blob);
+        });
+      }
+    } catch(e) { errs.push('heic2any:'+e.message); }
+    try { const bm = await createImageBitmap(file); return await new Promise((res)=>{ const c=document.createElement('canvas');c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);res(c); }); } catch(e) { errs.push('bitmap:'+e.message); }
+    throw new Error('HEIC変換失敗: '+errs.join(', '));
+  }
+  return new Promise((res, rej) => {
+    const img = new Image(); img.onload = () => {
+      let w = img.width, h = img.height;
+      if (maxPx && Math.max(w, h) > maxPx) { const s = maxPx / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h); res(c);
+    }; img.onerror = rej; img.src = URL.createObjectURL(file);
+  });
+}
+
+// ============================================================
+// Characterクラス（プレビュー用・シンプル版）
+// ============================================================
+class PreviewCharacter {
+  constructor(transparentCanvas, name) {
+    this.name = name;
+    this.parts = {};
+    this.imgW = transparentCanvas.width;
+    this.imgH = transparentCanvas.height;
+    this.t = 0;
+    this.animType = 'walk';
+    this.animAge = 0;
+    this.animLifetime = 8 * 60;
+    this.dir = 1;
+    this.vx = 2.5;
+    this._cutParts(transparentCanvas);
+    this.ready = true;
+  }
+  _cutParts(src) {
+    const W = src.width, H = src.height;
+    for (const [name, f] of Object.entries(FORMAT)) {
+      const pw = Math.round(f.sw * W), ph = Math.round(f.sh * H);
+      if (pw < 1 || ph < 1) continue;
+      const oc = document.createElement('canvas'); oc.width = pw; oc.height = ph;
+      oc.getContext('2d').drawImage(src, Math.round(f.sx*W), Math.round(f.sy*H), pw, ph, 0, 0, pw, ph);
+      // クリップ
+      if (name === 'head') {
+        const tmp = document.createElement('canvas'); tmp.width = pw; tmp.height = ph;
+        const tctx = tmp.getContext('2d');
+        tctx.beginPath(); tctx.ellipse(pw/2, ph/2, pw/2*0.93, ph/2*0.93, 0, 0, Math.PI*2); tctx.clip(); tctx.drawImage(oc, 0, 0);
+        oc.getContext('2d').clearRect(0, 0, pw, ph); oc.getContext('2d').drawImage(tmp, 0, 0);
+      } else if (['leftArm','rightArm'].includes(name)) {
+        const r = ph / 2; const tmp = document.createElement('canvas'); tmp.width = pw; tmp.height = ph;
+        const tctx = tmp.getContext('2d'); tctx.beginPath(); tctx.roundRect(0, 0, pw, ph, r); tctx.clip(); tctx.drawImage(oc, 0, 0);
+        oc.getContext('2d').clearRect(0,0,pw,ph); oc.getContext('2d').drawImage(tmp, 0, 0);
+      } else if (['leftLeg','rightLeg'].includes(name)) {
+        const r = pw / 2; const tmp = document.createElement('canvas'); tmp.width = pw; tmp.height = ph;
+        const tctx = tmp.getContext('2d'); tctx.beginPath(); tctx.roundRect(0, 0, pw, ph, r); tctx.clip(); tctx.drawImage(oc, 0, 0);
+        oc.getContext('2d').clearRect(0,0,pw,ph); oc.getContext('2d').drawImage(tmp, 0, 0);
+      } else if (name === 'torso') {
+        const r = Math.min(pw,ph)*0.18; const tmp = document.createElement('canvas'); tmp.width = pw; tmp.height = ph;
+        const tctx = tmp.getContext('2d'); tctx.beginPath(); tctx.roundRect(0, 0, pw, ph, r); tctx.clip(); tctx.drawImage(oc, 0, 0);
+        oc.getContext('2d').clearRect(0,0,pw,ph); oc.getContext('2d').drawImage(tmp, 0, 0);
+      }
+      this.parts[name] = { canvas:oc, w:pw, h:ph,
+        pvWX:(f.sx+f.sw*f.pvx)*W, pvWY:(f.sy+f.sh*f.pvy)*H,
+        ox:f.sx*W, oy:f.sy*H };
+    }
+  }
+  update(canvasW) {
+    const anim = ANIMATIONS[this.animType];
+    this.t += 1/60 * anim.tSpeed;
+    this.animAge++;
+    if (this.animAge > this.animLifetime) {
+      const keys = ['walk','dance','wave'];
+      this.animType = keys[Math.floor(Math.random() * keys.length)];
+      this.animAge = 0; this.animLifetime = (6 + Math.random()*8) * 60;
+    }
+    if (this.animType === 'walk') {
+      this.x = (this.x || canvasW / 2) + this.vx;
+      if (this.x > canvasW - 30) { this.vx = -Math.abs(this.vx); this.dir = -1; }
+      if (this.x < 30)           { this.vx =  Math.abs(this.vx); this.dir =  1; }
+    } else {
+      this.x = this.x || canvasW / 2;
+    }
+  }
+  draw(ctx, canvasW, canvasH) {
+    if (!this.ready || !this.parts.head) return;
+    const H = this.imgH, W = this.imgW;
+    const scale = 0.30;
+    const sc = (canvasH * scale) / H;
+    const groundY = canvasH * 0.82;
+    const x = this.x || canvasW / 2;
+    const anim = ANIMATIONS[this.animType];
+    const animState = anim.fn(this.t, this.dir);
+    const bob = animState.bob || 0;
+    const ARM_CLAMP = 38 * D, LEG_CLAMP = 35 * D;
+    const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v));
+    const angles = {
+      head: animState.head || 0, torso: 0,
+      leftArm:  clamp(animState.leftArm  || 0, ARM_CLAMP),
+      rightArm: clamp(animState.rightArm || 0, ARM_CLAMP),
+      leftLeg:  clamp(animState.leftLeg  || 0, LEG_CLAMP),
+      rightLeg: clamp(animState.rightLeg || 0, LEG_CLAMP),
+    };
+    ctx.save();
+    ctx.translate(x, groundY - bob);
+    if (this.dir === -1) ctx.scale(-1, 1);
+    const self = this;
+    function drawPart(pn) {
+      const part = self.parts[pn]; if (!part) return;
+      const ang = angles[pn] || 0;
+      const pvX = (part.pvWX - W*0.5)*sc;
+      const pvY = (part.pvWY - H)*sc;
+      const ox  = (part.ox - W*0.5)*sc;
+      const oy  = (part.oy - H)*sc;
+      const pw  = part.w * sc, ph = part.h * sc;
+      ctx.save(); ctx.translate(pvX, pvY); ctx.rotate(ang);
+      if (['leftArm','rightArm','leftLeg','rightLeg'].includes(pn)) {
+        ctx.save(); ctx.filter = `blur(${Math.max(1, sc*4).toFixed(1)}px)`;
+        ctx.drawImage(part.canvas, ox-pvX, oy-pvY, pw, ph); ctx.restore();
+      }
+      ctx.drawImage(part.canvas, ox-pvX, oy-pvY, pw, ph);
+      ctx.restore();
+    }
+    const leftLegAng = angles.leftLeg;
+    const order = leftLegAng <= 0
+      ? ['rightLeg','leftLeg','rightArm','leftArm','torso','head']
+      : ['leftLeg','rightLeg','rightArm','leftArm','torso','head'];
+    for (const pn of order) drawPart(pn);
+    ctx.restore();
+
+    // 名前タグ
+    ctx.save();
+    ctx.font = 'bold 14px sans-serif';
+    const label = this.name.length > 10 ? this.name.slice(0,10)+'…' : this.name;
+    const pad = 12, th = 26;
+    const tw = ctx.measureText(label).width + pad * 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.beginPath(); ctx.roundRect(x - tw/2, groundY + 6, tw, th, 10); ctx.fill();
+    ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, x, groundY + 6 + th/2);
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// アプリ状態
+// ============================================================
 let selectedFile = null;
+let previewChar = null;
+let animFrameId = null;
+let preparedBlob = null; // アップロード用のblobを保持
+
+const fileInput    = document.getElementById('fileInput');
+const thumbImg     = document.getElementById('thumbImg');
+const placeholder  = document.getElementById('placeholder');
+const checkBtn     = document.getElementById('checkBtn');
+const nameInput    = document.getElementById('nameInput');
+const uploadStatus = document.getElementById('uploadStatus');
+const sendStatus   = document.getElementById('sendStatus');
+const stepUpload   = document.getElementById('stepUpload');
+const stepPreview  = document.getElementById('stepPreview');
+const previewCanvas= document.getElementById('previewCanvas');
+const previewLabel = document.getElementById('previewLabel');
+const overlay      = document.getElementById('processOverlay');
+const processMsg   = document.getElementById('processMsg');
 
 // ============================================================
 // 写真選択
 // ============================================================
 fileInput.addEventListener('change', (e) => {
-const file = e.target.files[0];
-if (!file) return;
-selectedFile = file;
-const url = URL.createObjectURL(file);
-preview.src = url;
-preview.style.display = 'block';
-placeholder.style.display = 'none';
-uploadBtn.disabled = false;
+  const file = e.target.files[0];
+  if (!file) return;
+  selectedFile = file;
+  const url = URL.createObjectURL(file);
+  thumbImg.src = url;
+  thumbImg.style.display = 'block';
+  placeholder.style.display = 'none';
+  checkBtn.disabled = false;
+  setStatus(uploadStatus, '', '');
 });
 
 // ============================================================
-// アップロード
+// チェックボタン → プレビュー表示
 // ============================================================
-uploadBtn.addEventListener('click', async () => {
-if (!selectedFile) return;
-
-const name = nameInput.value.trim() || 'なまえなし';
-const ts = Date.now();
-const ext = (selectedFile.name.split('.').pop() || 'jpg').toLowerCase();
-// 日本語名をBase64URLエンコードしてASCII安全なファイル名にする
-const encodedName = btoa(encodeURIComponent(name))
-.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-const fileName = `${encodedName}_${ts}.${ext}`;
-
-uploadBtn.disabled = true;
-showStatus('loading', '📤 おくっています...');
-
-try {
-const { error } = await sbClient.storage
-.from(BUCKET)
-.upload(fileName, selectedFile, {
-contentType: selectedFile.type || 'image/jpeg',
-upsert: false
+checkBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  const name = nameInput.value.trim() || 'なまえなし';
+  showOverlay('📸 写真を読み込み中...');
+  try {
+    const imgCanvas = await resizeImage(selectedFile, 1400);
+    setMsg('🔍 テンプレートを検出中...');
+    const cropResult = detectAndCrop(imgCanvas);
+    if (!cropResult) {
+      hideOverlay();
+      setStatus(uploadStatus, 'error', '❌ 四隅のマーカー（■）が認識できませんでした。\nテンプレート用紙の四隅がすべて写るように撮り直してください。');
+      return;
+    }
+    setMsg('✂️ キャラクターを切り出し中...');
+    const transparent = removeWhiteBackground(cropResult.canvas);
+    // プレビューBlob生成（確定時にアップロード用）
+    preparedBlob = await canvasToBlob(transparent);
+    hideOverlay();
+    startPreview(transparent, name);
+  } catch(err) {
+    hideOverlay();
+    setStatus(uploadStatus, 'error', '❌ エラー: ' + err.message);
+  }
 });
 
-if (error) throw error;
-
-showStatus('success', `✅ ${name} がまちにとうじょうするよ！\nすこし待ってね 🎊`);
-
-// フォームリセット（3秒後）
-setTimeout(() => {
-selectedFile = null;
-fileInput.value = '';
-preview.src = '';
-preview.style.display = 'none';
-placeholder.style.display = 'block';
-nameInput.value = '';
-uploadBtn.disabled = true;
-statusEl.style.display = 'none';
-}, 3500);
-
-} catch (err) {
-console.error('アップロードエラー:', err);
-showStatus('error', `❌ しっぱいしました\n${err.message || 'もう一度ためしてね'}`);
-uploadBtn.disabled = false;
+function canvasToBlob(canvas) {
+  return new Promise(res => canvas.toBlob(b => res(b), 'image/png', 0.92));
 }
+
+// ============================================================
+// プレビュー開始
+// ============================================================
+function startPreview(transparentCanvas, name) {
+  stopPreview();
+  stepUpload.style.display = 'none';
+  stepPreview.style.display = 'block';
+  previewLabel.textContent = name;
+
+  const cv = previewCanvas;
+  cv.width = cv.offsetWidth * window.devicePixelRatio;
+  cv.height = cv.offsetHeight * window.devicePixelRatio;
+  cv.style.width = cv.offsetWidth + 'px';
+  cv.style.height = cv.offsetHeight + 'px';
+  const ctx = cv.getContext('2d');
+
+  previewChar = new PreviewCharacter(transparentCanvas, name);
+  previewChar.x = cv.width / 2;
+
+  // 背景：町っぽいグラデーション
+  function drawBg() {
+    const w = cv.width, h = cv.height;
+    const sky = ctx.createLinearGradient(0, 0, 0, h * 0.6);
+    sky.addColorStop(0, '#b3e0ff'); sky.addColorStop(1, '#e0f7fa');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h * 0.6);
+    // 地面
+    ctx.fillStyle = '#c8e6c9'; ctx.fillRect(0, h * 0.6, w, h * 0.4);
+    // 道路
+    ctx.fillStyle = '#bdbdbd'; ctx.fillRect(0, h * 0.72, w, h * 0.12);
+    // 道路の白線
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.setLineDash([20, 20]);
+    ctx.beginPath(); ctx.moveTo(0, h * 0.78); ctx.lineTo(w, h * 0.78); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function loop() {
+    const w = cv.width, h = cv.height;
+    ctx.clearRect(0, 0, w, h);
+    drawBg();
+    previewChar.update(w);
+    previewChar.draw(ctx, w, h * 0.82);
+    animFrameId = requestAnimationFrame(loop);
+  }
+  loop();
+  setStatus(sendStatus, '', '');
+}
+
+function stopPreview() {
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+}
+
+// ============================================================
+// やり直しボタン
+// ============================================================
+document.getElementById('retryBtn').addEventListener('click', () => {
+  stopPreview();
+  stepPreview.style.display = 'none';
+  stepUpload.style.display = 'block';
+  selectedFile = null; preparedBlob = null;
+  fileInput.value = '';
+  thumbImg.style.display = 'none';
+  placeholder.style.display = 'block';
+  checkBtn.disabled = true;
+  setStatus(uploadStatus, '', '');
 });
 
-function showStatus(type, msg) {
-statusEl.className = `status ${type}`;
-statusEl.textContent = msg;
-statusEl.style.display = 'block';
+// ============================================================
+// 「まちに送る！」ボタン → Supabaseアップロード
+// ============================================================
+document.getElementById('sendBtn').addEventListener('click', async () => {
+  if (!preparedBlob) return;
+  const name = nameInput.value.trim() || 'なまえなし';
+  const ts = Date.now();
+  const encodedName = btoa(encodeURIComponent(name)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  const fileName = `${encodedName}_${ts}.png`;
+
+  document.getElementById('sendBtn').disabled = true;
+  setStatus(sendStatus, 'loading', '📤 まちに送っています...');
+  stopPreview();
+
+  try {
+    const { error } = await sbClient.storage.from(BUCKET).upload(fileName, preparedBlob, {
+      contentType: 'image/png', upsert: false
+    });
+    if (error) throw error;
+    setStatus(sendStatus, 'success', `✅ ${name} がまちにとうじょうするよ！\nすこし待ってね 🎊`);
+    setTimeout(() => {
+      stopPreview();
+      stepPreview.style.display = 'none';
+      stepUpload.style.display = 'block';
+      selectedFile = null; preparedBlob = null;
+      fileInput.value = '';
+      thumbImg.style.display = 'none';
+      placeholder.style.display = 'block';
+      nameInput.value = '';
+      checkBtn.disabled = true;
+      document.getElementById('sendBtn').disabled = false;
+      setStatus(uploadStatus, '', '');
+    }, 3500);
+  } catch(err) {
+    setStatus(sendStatus, 'error', '❌ 送信失敗: ' + err.message);
+    document.getElementById('sendBtn').disabled = false;
+    animFrameId = requestAnimationFrame(function loop(){ previewChar && previewChar.update(previewCanvas.width); const ctx = previewCanvas.getContext('2d'); ctx.clearRect(0,0,previewCanvas.width,previewCanvas.height); animFrameId = requestAnimationFrame(loop); });
+  }
+});
+
+// ============================================================
+// ヘルパー
+// ============================================================
+function showOverlay(msg) { processMsg.textContent = msg; overlay.classList.add('show'); }
+function setMsg(msg) { processMsg.textContent = msg; }
+function hideOverlay() { overlay.classList.remove('show'); }
+function setStatus(el, type, msg) {
+  if (!type) { el.style.display = 'none'; return; }
+  el.className = 'status ' + type;
+  el.textContent = msg;
+  el.style.display = 'block';
 }
 </script>
 </body>
