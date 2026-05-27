@@ -1719,6 +1719,8 @@ requestAnimationFrame(loop);
 
 // ★ 読み込み済みファイル名を管理（重複ロード防止）
 const loadedCharacterNames = new Set();
+  let isInitialLoad = true;          // 起動時フラグ
+  const INITIAL_LOAD_MAX = 5;        // 起動時に表示するキャラ最大数
 
 // 右下に小さいトースト通知（Supabase自動読み込み用）
 function showInfoToast(msg, type = 'info') {
@@ -1882,9 +1884,19 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         return IMAGE_EXTS.has(ext);
       });
 
-      // まだ読み込んでいないファイルを抽出
-      const newFiles = imageFiles.filter(f => !loadedCharacterNames.has(f.name));
+      // まだ読み込んでいないファイルを抽出（古い順）
+      let newFiles = imageFiles.filter(f => !loadedCharacterNames.has(f.name));
       if (newFiles.length === 0) return;
+
+      // 起動時は最新 INITIAL_LOAD_MAX 件だけ表示、古いものはスキップ登録
+      if (isInitialLoad) {
+        isInitialLoad = false;
+        if (newFiles.length > INITIAL_LOAD_MAX) {
+          const toSkip = newFiles.slice(0, newFiles.length - INITIAL_LOAD_MAX);
+          toSkip.forEach(f => loadedCharacterNames.add(f.name));
+          newFiles = newFiles.slice(newFiles.length - INITIAL_LOAD_MAX);
+        }
+      }
 
       // 新しいファイルを1つずつフェッチしてキャラとして追加
       for (const f of newFiles) {
