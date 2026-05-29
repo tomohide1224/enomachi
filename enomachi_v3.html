@@ -1895,14 +1895,20 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const ROOM_ID = crypto.randomUUID().replace(/-/g,'').substring(0, 8).toUpperCase();
 document.getElementById('roomIdDisplay').textContent = ROOM_ID;
 
-// QRコード生成（DOMContentLoaded後）
-window.addEventListener('DOMContentLoaded', () => {
+// QRコード生成（スクリプトはbody末尾なのでDOM確定済み）
+(function generateQR() {
   const uploadUrl = `${location.origin}/upload.html?room=${ROOM_ID}`;
-  QRCode.toCanvas(document.getElementById('qrCanvas'), uploadUrl, {
-    width: 130, margin: 1,
-    color: { dark: '#222222', light: '#ffffff' }
-  }, (err) => { if (err) console.warn('QR生成エラー:', err); });
-});
+  const canvas = document.getElementById('qrCanvas');
+  if (typeof QRCode !== 'undefined' && canvas) {
+    QRCode.toCanvas(canvas, uploadUrl, {
+      width: 130, margin: 1,
+      color: { dark: '#222222', light: '#ffffff' }
+    }, (err) => { if (err) console.warn('QR生成エラー:', err); });
+  } else {
+    // ライブラリ読み込み待ち
+    setTimeout(generateQR, 200);
+  }
+})();
 
 // ======================================================
 // ===== 自動ロード：Supabase Realtime でリアルタイム受信 =====
