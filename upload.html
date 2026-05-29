@@ -67,6 +67,13 @@ input[type="text"]:focus { border-color:#ff9a9e; }
   box-shadow:none; margin-bottom:0;
 }
 
+/* ルームなし警告 */
+#noRoomWarning {
+  display:none; background:#fff3cd; border:2px solid #ffc107;
+  border-radius:14px; padding:16px 18px; margin-bottom:18px;
+  font-size:14px; line-height:1.7; color:#856404; text-align:center;
+}
+
 /* ステップ管理 */
 #stepUpload { display:block; }
 #stepPreview { display:none; }
@@ -111,7 +118,14 @@ input[type="text"]:focus { border-color:#ff9a9e; }
 <body>
 <div class="card">
   <div class="title">🏘️ えのまち</div>
-  <div class="subtitle">キャラクターをとうろくしてね！</div>
+  <div class="subtitle" id="roomBadge">キャラクターをとうろくしてね！</div>
+
+  <!-- ルームなし警告 -->
+  <div id="noRoomWarning">
+    ⚠️ えのまちの画面に表示されている<br>
+    <strong>QRコードをスキャン</strong>してアクセスしてね！<br>
+    直接このURLを開いても送れないよ。
+  </div>
 
   <!-- STEP 1: アップロード -->
   <div id="stepUpload">
@@ -164,6 +178,25 @@ const SUPABASE_KEY = 'sb_publishable_X82W_W9Ib7C6Xua27N1Z0A_vw1FKztj';
 const BUCKET = 'characters';
 const { createClient } = window.supabase;
 const sbClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ============================================================
+// ルームID取得（えのまちのQRコードから?room=で渡される）
+// ============================================================
+const ROOM_ID = new URLSearchParams(location.search).get('room') || null;
+
+// ROOM_IDに応じてUIを初期化
+(function initRoomUI() {
+  if (ROOM_ID) {
+    document.getElementById('roomBadge').textContent = `📺 画面 ${ROOM_ID} に送るよ！`;
+    document.getElementById('noRoomWarning').style.display = 'none';
+  } else {
+    document.getElementById('roomBadge').textContent = 'キャラクターをとうろくしてね！';
+    document.getElementById('noRoomWarning').style.display = 'block';
+    // ルームなしの場合は操作を無効化
+    document.getElementById('stepUpload').style.opacity = '0.4';
+    document.getElementById('stepUpload').style.pointerEvents = 'none';
+  }
+})();
 
 // ============================================================
 // FORMAT & ANIMATIONS（えのまちと共通）
@@ -617,19 +650,36 @@ document.getElementById('retryBtn').addEventListener('click', () => {
 document.getElementById('sendBtn').addEventListener('click', async () => {
   if (!preparedBlob) return;
   const name = nameInput.value.trim() || 'なまえなし';
+  if (!ROOM_ID) {
+    setStatus(sendStatus, 'error', '❌ QRコードからアクセスしてね！');
+    return;
+  }
+
   const ts = Date.now();
   const encodedName = btoa(encodeURIComponent(name)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
   const fileName = `${encodedName}_${ts}.png`;
+  const filePath = `${ROOM_ID}/${fileName}`; // ルームIDサブフォルダ
 
   document.getElementById('sendBtn').disabled = true;
   setStatus(sendStatus, 'loading', '📤 まちに送っています...');
   stopPreview();
 
   try {
-    const { error } = await sbClient.storage.from(BUCKET).upload(fileName, preparedBlob, {
+    const { error } = await sbClient.storage.from(BUCKET).upload(filePath, preparedBlob, {
       contentType: 'image/png', upsert: false
     });
     if (error) throw error;
+
+    // Realtimeでえのまちに即時通知
+    const channel = sbClient.channel(`enomachi-${ROOM_ID}`);
+    await channel.subscribe();
+    await channel.send({
+      type: 'broadcast',
+      event: 'new_character',
+      payload: { filePath }
+    });
+    sbClient.removeChannel(channel);
+
     setStatus(sendStatus, 'success', `✅ ${name} がまちにとうじょうするよ！\nすこし待ってね 🎊`);
     setTimeout(() => {
       stopPreview();

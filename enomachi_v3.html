@@ -8,6 +8,8 @@
   <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
   <!-- Supabase JS クライアント -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- QRコード生成 -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { background:#000; overflow:hidden; }
@@ -82,6 +84,24 @@
       animation:spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ===== QRコードパネル（左上） ===== */
+    #qrPanel {
+      position:absolute; top:16px; left:16px;
+      background:rgba(255,255,255,0.96); border-radius:16px;
+      padding:12px 14px; z-index:100;
+      box-shadow:0 4px 20px rgba(0,0,0,0.22);
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+    }
+    #qrCanvas { width:130px; height:130px; border-radius:4px; }
+    #roomIdDisplay {
+      font-size:18px; font-weight:900; color:#334;
+      letter-spacing:0.2em; font-family:monospace;
+    }
+    #qrLabel {
+      font-size:11px; color:#888; font-weight:bold;
+      text-align:center; letter-spacing:0.03em;
+    }
 
     /* ===== デバッグ表示 ===== */
     #debugInfo {
@@ -172,6 +192,13 @@
   <button id="addBtn">🎨 えをついか</button>
   <input type="file" id="fileInput" accept="image/*" multiple>
 
+
+  <!-- QRコードパネル（左上） -->
+  <div id="qrPanel">
+    <canvas id="qrCanvas"></canvas>
+    <div id="roomIdDisplay">----</div>
+    <div id="qrLabel">📱 スタッフはここをスキャン</div>
+  </div>
 
   <!-- 設定ボタン（左下） -->
   <button id="settingsBtn">⏱ <span id="countdownSmall">5:00</span></button>
@@ -1863,85 +1890,88 @@ const SUPABASE_BUCKET = 'characters';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ======================================================
-// ===== 自動ロード：Supabase Storage を監視（起動時 + 3秒ごと）=====
+// ===== ルームID：起動ごとにランダム生成 =====
+// ======================================================
+const ROOM_ID = crypto.randomUUID().replace(/-/g,'').substring(0, 8).toUpperCase();
+document.getElementById('roomIdDisplay').textContent = ROOM_ID;
+
+// QRコード生成（DOMContentLoaded後）
+window.addEventListener('DOMContentLoaded', () => {
+  const uploadUrl = `${location.origin}/upload.html?room=${ROOM_ID}`;
+  QRCode.toCanvas(document.getElementById('qrCanvas'), uploadUrl, {
+    width: 130, margin: 1,
+    color: { dark: '#222222', light: '#ffffff' }
+  }, (err) => { if (err) console.warn('QR生成エラー:', err); });
+});
+
+// ======================================================
+// ===== 自動ロード：Supabase Realtime でリアルタイム受信 =====
 // ======================================================
 (function startCharacterWatcher() {
-  const POLL_INTERVAL = 3000; // 3秒ごとにチェック
-  const IMAGE_EXTS    = new Set(['jpg','jpeg','png','webp','heic','heif']);
+  const IMAGE_EXTS = new Set(['jpg','jpeg','png','webp','heic','heif']);
 
-  async function checkForNewCharacters() {
+  // ファイルパスからキャラを読み込んで表示・削除
+  async function loadAndDisplayFile(filePath) {
+    if (loadedCharacterNames.has(filePath)) return;
+    loadedCharacterNames.add(filePath);
+
+    const fileName = filePath.split('/').pop();
     try {
-      // Supabase Storageのファイル一覧を取得（古い順）
-      const { data: files, error } = await sbClient.storage
-        .from(SUPABASE_BUCKET)
-        .list('', { sortBy: { column: 'created_at', order: 'asc' } });
+      const { data: urlData } = sbClient.storage
+        .from(SUPABASE_BUCKET).getPublicUrl(filePath);
 
-      if (error || !files) return;
+      showInfoToast(`📥 ${fileName}`, 'info');
+      const imgRes = await fetch(urlData.publicUrl + '?t=' + Date.now());
+      if (!imgRes.ok) return;
+      const blob = await imgRes.blob();
+      const file = new File([blob], fileName, { type: blob.type });
 
-      // 画像ファイルだけ抽出（HTMLなどを除外）
-      const imageFiles = files.filter(f => {
-        const ext = f.name.split('.').pop().toLowerCase();
-        return IMAGE_EXTS.has(ext);
-      });
-
-      // まだ読み込んでいないファイルを抽出（古い順）
-      let newFiles = imageFiles.filter(f => !loadedCharacterNames.has(f.name));
-      if (newFiles.length === 0) return;
-
-      // 起動時は最新 INITIAL_LOAD_MAX 件だけ表示、古いものはスキップ登録
-      if (isInitialLoad) {
-        isInitialLoad = false;
-        if (newFiles.length > INITIAL_LOAD_MAX) {
-          const toSkip = newFiles.slice(0, newFiles.length - INITIAL_LOAD_MAX);
-          toSkip.forEach(f => loadedCharacterNames.add(f.name));
-          newFiles = newFiles.slice(newFiles.length - INITIAL_LOAD_MAX);
-        }
-      }
-
-      // 新しいファイルを1つずつフェッチしてキャラとして追加
-      for (const f of newFiles) {
-        try {
-          const { data: urlData } = sbClient.storage
-            .from(SUPABASE_BUCKET)
-            .getPublicUrl(f.name);
-
-          showInfoToast(`📥 読み込み中...\n${f.name}`, 'info');
-          const imgRes = await fetch(urlData.publicUrl);
-          if (!imgRes.ok) { showInfoToast(`❌ 取得失敗: ${f.name}`, 'error'); loadedCharacterNames.add(f.name); continue; }
-          const blob = await imgRes.blob();
-          const file = new File([blob], f.name, { type: blob.type });
-
-          // PNGはスタッフ画面で処理済みの透明画像 → テンプレート検出スキップして直接追加
-          const isPng = f.name.toLowerCase().endsWith('.png');
-          if (isPng) {
-            await addProcessedCharacter(file);
-          } else {
-            await processCharacterFile(file, true);  // silent=true（JPEG等：マーカー検出あり）
-          }
-          console.log(`✅ Supabaseから自動追加: ${f.name}`);
-        } catch(e) {
-          showInfoToast(`⚠️ エラー: ${f.name}\n${e.message}`, 'error');
-          console.warn(`⚠️ 自動追加失敗: ${f.name}`, e);
-        }
-      }
+      await addProcessedCharacter(file, filePath); // 表示後に削除
+      console.log(`✅ 受信・表示: ${filePath}`);
     } catch(e) {
-      // エラーは静かにスキップ
+      showInfoToast(`⚠️ 読み込みエラー: ${fileName}`, 'error');
+      console.warn('loadAndDisplayFile error:', e);
     }
   }
 
-  // 起動時に即実行
-  window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(checkForNewCharacters, 500);
-  });
+  // 起動時：自分のルームフォルダに残っているファイルを処理（再接続対応）
+  async function checkExistingFiles() {
+    try {
+      const { data: files } = await sbClient.storage
+        .from(SUPABASE_BUCKET)
+        .list(ROOM_ID, { sortBy: { column: 'created_at', order: 'asc' } });
 
-  // 3秒ごとにポーリング
-  setInterval(checkForNewCharacters, POLL_INTERVAL);
+      if (!files || files.length === 0) return;
+      const imageFiles = files.filter(f =>
+        IMAGE_EXTS.has(f.name.split('.').pop().toLowerCase())
+      );
+      for (const f of imageFiles) {
+        await loadAndDisplayFile(`${ROOM_ID}/${f.name}`);
+      }
+    } catch(e) {
+      console.warn('checkExistingFiles error:', e);
+    }
+  }
+
+  // Realtimeブロードキャストを購読
+  sbClient.channel(`enomachi-${ROOM_ID}`)
+    .on('broadcast', { event: 'new_character' }, async (payload) => {
+      const { filePath } = payload.payload;
+      if (filePath) await loadAndDisplayFile(filePath);
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`✅ Realtime接続 room=${ROOM_ID}`);
+        checkExistingFiles(); // 接続後に未処理ファイルをチェック
+      }
+    });
 })();
 
 // ======================================================
 // ===== 処理済みPNG（スタッフ画面アップ）を直接キャラ追加 =====
 // ======================================================
-async function addProcessedCharacter(file) {
+// filePath: Supabase上のパス（例 "ABCD1234/name_ts.png"）、null=手動追加
+async function addProcessedCharacter(file, filePath = null) {
   // ファイル名から名前をデコード（processCharacterFileと同じロジック）
   const rawName = file.name.replace(/\.[^.]+$/, '');
   let name = rawName;
@@ -1969,7 +1999,6 @@ async function addProcessedCharacter(file) {
     });
 
     characters.push(new Character(imgCanvas, name));
-    loadedCharacterNames.add(file.name);
     showInfoToast(`🎉 ${name} が登場！`, 'success');
 
     if (characters.length > 10) {
@@ -1979,6 +2008,13 @@ async function addProcessedCharacter(file) {
     while (characters.length > 12) {
       const idx = characters.findIndex(c => c.leaving);
       if (idx >= 0) characters.splice(idx, 1); else characters.shift();
+    }
+
+    // Supabaseから取得したファイルは表示後に削除
+    if (filePath) {
+      sbClient.storage.from(SUPABASE_BUCKET).remove([filePath])
+        .then(() => console.log(`🗑️ 削除: ${filePath}`))
+        .catch(e => console.warn('削除失敗:', e));
     }
   } catch(err) {
     showInfoToast(`⚠️ PNG読み込みエラー: ${name}\n${err.message}`, 'error');
