@@ -1099,12 +1099,12 @@ class Character {
     this.t     = Math.random() * Math.PI * 2;
     this.scale = 0.18 + Math.random() * 0.06;
     // アニメーションタイプ（ランダム、一定時間で切り替え）
-    // ★ 登場直後はsleep以外からランダムに選ぶ
-    const movableInit = ANIM_KEYS.filter(k => k !== 'sleep');
-    this.animType     = movableInit[Math.floor(Math.random() * movableInit.length)];
-    this.animLifetime = (8 + Math.random() * 12) * 60; // フレーム数（8〜20秒）
-    // ★ stagger：全員同時に切り替えしないようにランダムな位置からスタート
+    // ★ 登場直後は wave（自己紹介シーン）
+    this.animType     = 'wave';
+    this.animLifetime = (8 + Math.random() * 12) * 60;
     this.animAge      = Math.floor(Math.random() * this.animLifetime * 0.7);
+    // ★ 登場シーン（自己紹介）
+    this.entrance = { active: true, age: 0, duration: 260 }; // ~4.3秒
     // 2D速度ベクトル（入射角=反射角の物理）
     const spd   = 2.0 + Math.random() * 1.2;
     const ang   = (Math.random() - 0.5) * 1.0; // 水平±約30度
@@ -1262,6 +1262,27 @@ class Character {
 
     const anim = ANIMATIONS[this.animType];
     this.t += dt * anim.tSpeed;
+
+    // ===== 登場シーン（自己紹介）=====
+    if (this.entrance && this.entrance.active) {
+      this.entrance.age++;
+      this.animType = 'wave'; // wave固定
+      this.vx = 0; this.vy = 0; // その場で止まる
+      if (this.entrance.age >= this.entrance.duration) {
+        this.entrance.active = false;
+        // 終了後：通常アニメ・通常移動に移行
+        const movable = ANIM_KEYS.filter(k => k !== 'sleep');
+        this.animType = movable[Math.floor(Math.random() * movable.length)];
+        this.animAge  = 0;
+        const spd = 2.0 + Math.random() * 1.2;
+        const ang = (Math.random() - 0.5) * 1.0;
+        this.vx = Math.cos(ang) * spd * (Math.random() < 0.5 ? 1 : -1);
+        this.vy = Math.sin(ang) * spd;
+        this.dir = Math.sign(this.vx);
+        this.chatState.cooldown = 120; // 登場直後はすぐ会話しない
+      }
+      return; // 登場中は移動・会話ロジックをスキップ
+    }
 
     // ===== 会話状態の更新 =====
     if (this.chatState.cooldown > 0) this.chatState.cooldown--;
@@ -1466,6 +1487,61 @@ class Character {
         ctx.globalAlpha = 1;
         ctx.restore();
       });
+    }
+
+    // ===== 登場吹き出し（自己紹介） =====
+    if (this.entrance && this.entrance.active) {
+      const { age, duration } = this.entrance;
+      const fadeIn  = Math.min(1, age / 20);
+      const fadeOut = Math.min(1, (duration - age) / 25);
+      const bAlpha  = Math.min(fadeIn, fadeOut);
+      if (bAlpha > 0) {
+        const hTopY = groundY + this.y - bob + (FORMAT.head.sy * H - H) * sc;
+        const line1 = 'はじめまして！';
+        const line2 = `${this.name}です！よろしくね！`;
+        ctx.save();
+        ctx.globalAlpha = bAlpha;
+
+        const fontSize = 24;
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        const w1 = ctx.measureText(line1).width;
+        const w2 = ctx.measureText(line2).width;
+        const maxW = Math.max(w1, w2);
+        const padX = 20, padY = 14, lineGap = 8;
+        const tw = maxW + padX * 2;
+        const th = fontSize * 2 + lineGap + padY * 2;
+        const bx = Math.max(8, Math.min(this.x - tw / 2, ctx.canvas.width - tw - 8));
+        const by = hTopY - th - 28;
+
+        // バブル本体（大きめ・ピンク系）
+        ctx.fillStyle   = 'rgba(255,240,250,0.97)';
+        ctx.strokeStyle = '#ff88bb';
+        ctx.lineWidth   = 3;
+        ctx.beginPath(); ctx.roundRect(bx, by, tw, th, 16); ctx.fill(); ctx.stroke();
+
+        // しっぽ
+        ctx.fillStyle = 'rgba(255,240,250,0.97)';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 10, by + th - 1);
+        ctx.lineTo(this.x,      by + th + 14);
+        ctx.lineTo(this.x + 10, by + th - 1);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#ff88bb';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 10, by + th);
+        ctx.lineTo(this.x,      by + th + 14);
+        ctx.lineTo(this.x + 10, by + th);
+        ctx.stroke();
+
+        // テキスト 2行
+        ctx.fillStyle = '#cc2266';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(line1, bx + tw / 2, by + padY + fontSize / 2);
+        ctx.fillText(line2, bx + tw / 2, by + padY + fontSize + lineGap + fontSize / 2);
+        ctx.textBaseline = 'alphabetic';
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
     }
 
     // ===== 退場吹き出し「帰るね〜！」（退場中は常に表示・大きめ）=====
