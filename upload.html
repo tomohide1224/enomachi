@@ -401,11 +401,8 @@ class PreviewCharacter {
     this.imgW = transparentCanvas.width;
     this.imgH = transparentCanvas.height;
     this.t = 0;
-    this.animType = 'walk';
-    this.animAge = 0;
-    this.animLifetime = 8 * 60;
+    this.animType = 'wave';
     this.dir = 1;
-    this.vx = 2.5;
     this._cutParts(transparentCanvas);
     this.ready = true;
   }
@@ -441,26 +438,16 @@ class PreviewCharacter {
     }
   }
   update(canvasW) {
+    this.animType = 'wave';
     const anim = ANIMATIONS[this.animType];
     this.t += 1/60 * anim.tSpeed;
-    this.animAge++;
-    if (this.animAge > this.animLifetime) {
-      const keys = ['walk','dance','wave'];
-      this.animType = keys[Math.floor(Math.random() * keys.length)];
-      this.animAge = 0; this.animLifetime = (6 + Math.random()*8) * 60;
-    }
-    if (this.animType === 'walk') {
-      this.x = (this.x || canvasW / 2) + this.vx;
-      if (this.x > canvasW - 30) { this.vx = -Math.abs(this.vx); this.dir = -1; }
-      if (this.x < 30)           { this.vx =  Math.abs(this.vx); this.dir =  1; }
-    } else {
-      this.x = this.x || canvasW / 2;
-    }
+    this.x = canvasW / 2;
+    this.dir = 1;
   }
   draw(ctx, canvasW, canvasH) {
     if (!this.ready || !this.parts.head) return;
     const H = this.imgH, W = this.imgW;
-    const scale = 0.30;
+    const scale = 0.55;
     const sc = (canvasH * scale) / H;
     const groundY = canvasH * 0.82;
     const x = this.x || canvasW / 2;
