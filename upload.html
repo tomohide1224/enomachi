@@ -66,6 +66,13 @@ input[type="text"]:focus { border-color:#ff9a9e; }
   background:#f5f5f5; color:#666; font-size:16px;
   box-shadow:none; margin-bottom:0;
 }
+.btn-retake {
+  width:100%; padding:14px; border:none; border-radius:18px;
+  font-size:16px; font-weight:bold; cursor:pointer;
+  background:linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color:white; box-shadow:0 8px 24px rgba(245,87,108,0.35);
+  margin-top:10px; display:none;
+}
 
 /* ルームなし警告 */
 #noRoomWarning {
@@ -146,6 +153,7 @@ input[type="text"]:focus { border-color:#ff9a9e; }
       🔍 キャラクターをチェック！
     </button>
     <div class="status" id="uploadStatus"></div>
+    <button class="btn-retake" id="retakeBtn">📷 もう一度撮り直す</button>
   </div>
 
   <!-- STEP 2: プレビュー確認 -->
@@ -560,14 +568,14 @@ checkBtn.addEventListener('click', async () => {
     if (!cropResult) {
       hideOverlay();
       setStatus(uploadStatus, 'error', '❌ 四隅のマーカー（■）が認識できませんでした。\nテンプレート用紙の四隅がすべて写るように撮り直してください。');
+      document.getElementById('retakeBtn').style.display = 'block';
       return;
     }
     setMsg('✂️ キャラクターを切り出し中...');
-    const transparent = removeWhiteBackground(cropResult.canvas);
-    // プレビューBlob生成（確定時にアップロード用）
-    preparedBlob = await canvasToBlob(transparent);
+    // 透過処理なし：クロップ画像をそのまま使用
+    preparedBlob = await canvasToBlob(cropResult.canvas);
     hideOverlay();
-    startPreview(transparent, name);
+    startPreview(cropResult.canvas, name);
   } catch(err) {
     hideOverlay();
     setStatus(uploadStatus, 'error', '❌ エラー: ' + err.message);
@@ -642,6 +650,20 @@ document.getElementById('retryBtn').addEventListener('click', () => {
   placeholder.style.display = 'block';
   checkBtn.disabled = true;
   setStatus(uploadStatus, '', '');
+  document.getElementById('retakeBtn').style.display = 'none';
+});
+
+// 撮り直すボタン（マーカー検出エラー時）
+document.getElementById('retakeBtn').addEventListener('click', () => {
+  setStatus(uploadStatus, '', '');
+  document.getElementById('retakeBtn').style.display = 'none';
+  selectedFile = null; preparedBlob = null;
+  fileInput.value = '';
+  thumbImg.style.display = 'none';
+  placeholder.style.display = 'block';
+  checkBtn.disabled = true;
+  // カメラ/ファイル選択を再度開く
+  fileInput.click();
 });
 
 // ============================================================
