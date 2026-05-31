@@ -1908,7 +1908,8 @@ async function processCharacterFile(file, silent = false) {
       const encoded = rawName.substring(0, lastUnder);
       // Base64URL → Base64 → デコード
       const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-      const decoded = decodeURIComponent(atob(b64));
+      const b64padded = b64 + '==='.slice(0, (4 - b64.length % 4) % 4);
+      const decoded = decodeURIComponent(atob(b64padded));
       if (decoded) name = decoded;
     }
   } catch(e) {
@@ -2089,7 +2090,8 @@ async function addProcessedCharacter(file, filePath = null) {
     const lastUnder = rawName.lastIndexOf('_');
     if (lastUnder > 0) {
       const b64 = rawName.substring(0, lastUnder).replace(/-/g, '+').replace(/_/g, '/');
-      const decoded = decodeURIComponent(atob(b64));
+      const b64padded = b64 + '==='.slice(0, (4 - b64.length % 4) % 4);
+      const decoded = decodeURIComponent(atob(b64padded));
       if (decoded) name = decoded;
     }
   } catch(e) { name = rawName; }
