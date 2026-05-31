@@ -438,7 +438,12 @@ class PreviewCharacter {
     }
   }
   update(canvasW) {
-    this.animType = 'wave';
+    if (this._animTimer === undefined) { this._animTimer = 0; this.animType = 'wave'; }
+    this._animTimer += 1/60;
+    if (this._animTimer > 5) {
+      this._animTimer = 0;
+      this.animType = this.animType === 'wave' ? 'dance' : 'wave';
+    }
     const anim = ANIMATIONS[this.animType];
     this.t += 1/60 * anim.tSpeed;
     this.x = canvasW / 2;
