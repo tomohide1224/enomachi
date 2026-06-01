@@ -389,12 +389,22 @@ let announcementState = null;
 
     const chars = typeof characters !== 'undefined' ? characters : [];
     const SW = window.innerWidth;
+    const SH = window.innerHeight;
     const n = chars.length;
+    // bg範囲を計算（pillarbox対応）
+    let _gxL = SW * 0.10, _gxR = SW * 0.90;
+    if (typeof bgImage !== 'undefined' && bgImage) {
+      const _bs = SH / bgImage.height;
+      const _bw = bgImage.width * _bs;
+      const _bdx = (SW - _bw) / 2;
+      _gxL = _bdx + _bw * 0.05;
+      _gxR = _bdx + _bw * 0.95;
+    }
 
     // ── Phase 1（今すぐ）：集合ターゲットをセット → 3秒かけてゆっくり集まる ──
     if (n > 0) {
       chars.forEach((c, idx) => {
-        const tx = n === 1 ? SW / 2 : SW * 0.10 + (SW * 0.80) * idx / (n - 1);
+        const tx = n === 1 ? (_gxL + _gxR) / 2 : _gxL + (_gxR - _gxL) * idx / (n - 1);
         c.gatherTarget = { x: tx, y: 0 };
         c.leaving = false;
         if (c.chatState) { c.chatState.active = false; c.chatState.cooldown = 0; }
@@ -406,7 +416,7 @@ let announcementState = null;
       if (n > 0) {
         chars.forEach((c, idx) => {
           c.gatherTarget = null;          // 集合完了
-          c.x = n === 1 ? SW / 2 : SW * 0.10 + (SW * 0.80) * idx / (n - 1);
+          c.x = n === 1 ? (_gxL + _gxR) / 2 : _gxL + (_gxR - _gxL) * idx / (n - 1);
           c.y = 0;
           c.vx = 0; c.vy = 0;
           c.animType = 'wave';
@@ -1107,11 +1117,20 @@ class Character {
     this.entrance = { active: true, age: 0, duration: 260 }; // ~4.3秒
     // 2D速度ベクトル（入射角=反射角の物理）
     const spd   = 2.0 + Math.random() * 1.2;
-    const ang   = (Math.random() - 0.5) * 1.0; // 水平±約30度
-    const signX = Math.random() < 0.5 ? 1 : -1;
-    this.vx  = Math.cos(ang) * spd * signX;
+    const ang   = (Math.random() - 0.5) * 0.5; // 水平±約15度
+    this.vx  = -Math.cos(ang) * spd; // 常に左向きで登場
     this.vy  = Math.sin(ang) * spd;
-    this.x   = 80 + Math.random() * (window.innerWidth - 160);
+    // 登場位置: 背景画像がある場合は右端、なければ画面右端
+    { const _SW = window.innerWidth, _SH = window.innerHeight;
+      let _xR = _SW - 30;
+      if (bgImage) {
+        const _bs = _SH / bgImage.height;
+        const _bw = bgImage.width * _bs;
+        const _bdx = (_SW - _bw) / 2;
+        _xR = _bdx + _bw - 30;
+      }
+      this.x = _xR;
+    }
     // yは有効範囲内でランダム初期化（頭が上部20%に入らないよう身長分を引く）
     // yMin = -SH*(0.60 - scale) : 頭がちょうど20%ラインに来る位置
     const _initSH = window.innerHeight;
@@ -2180,6 +2199,9 @@ function drawBackground(){
 
   // カスタム背景画像がある場合はそれを描画して終了
   if (bgImage) {
+    // まず全体を黒で塗りつぶし（黒帯保証）
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
     // 縦幅に合わせてスケール、左右は黒帯（pillarbox）
     const scale = H / bgImage.height;
     const dw = bgImage.width * scale;
