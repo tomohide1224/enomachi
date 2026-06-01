@@ -557,14 +557,14 @@ const ANIMATIONS = {
     }),
   },
   wave: {
-    tSpeed: 8.0, moveMult: 0,
+    tSpeed: 5.0, moveMult: 0,
     fn: (t, d) => ({
-      head: Math.sin(t*3)*6*D, torso: 0,
-      leftArm:  -85*D + Math.sin(t*5)*30*D,
-      rightArm:  85*D - Math.sin(t*5)*30*D,
+      head: Math.sin(t*3)*5*D, torso: 0,
+      leftArm:  -75*D + Math.sin(t*4)*20*D,
+      rightArm: -75*D + Math.sin(t*4 + Math.PI)*20*D,
       leftLeg:   Math.sin(t*0.5)*3*D*d,
       rightLeg: -Math.sin(t*0.5)*3*D*d,
-      bob: Math.abs(Math.sin(t*2))*3,
+      bob: 2,
     }),
   },
   skip: {
@@ -1385,7 +1385,8 @@ class Character {
     // ★ 胴体は常に固定（0）。腕・脚は可動域クランプ。
     // sleep（bodyAngle あり）はクランプ除外（腕 82° を許容するため）
     const isSleeping = !!(animState.bodyAngle);
-    const ARM_CLAMP = isSleeping ? 88 * D : 38 * D;  // 通常は±38°以内
+    const isWaving = this.animType === 'wave';
+    const ARM_CLAMP = isSleeping ? 88 * D : isWaving ? 90 * D : 38 * D;  // wave時は90°まで許容
     const LEG_CLAMP = isSleeping ? 88 * D : 35 * D;  // 通常は±35°以内
     const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v));
     const angles = {
