@@ -137,8 +137,7 @@
     #openingVideo {
       position:absolute; inset:0;
       width:100%; height:100%;
-      object-fit:contain;
-      background:#000;
+      object-fit:cover;
       display:none;
     }
     /* タップしてはじめる スタート画面 */
@@ -2165,12 +2164,12 @@ function drawBackground(){
 
   // カスタム背景画像がある場合はそれを描画して終了
   if (bgImage) {
-    // アスペクト比を保ちながら縦に合わせる（横は黒帯）
-    const scale = Math.min(W / bgImage.width, H / bgImage.height);
+    // 縦幅に合わせてスケール、左右は黒帯（pillarbox）
+    const scale = H / bgImage.height;
     const dw = bgImage.width * scale;
-    const dh = bgImage.height * scale;
+    const dh = H;
     const dx = (W - dw) / 2;
-    const dy = (H - dh) / 2;
+    const dy = 0;
     ctx.drawImage(bgImage, dx, dy, dw, dh);
     return;
   }
