@@ -1801,10 +1801,22 @@ function loop(ts){
   }
 
   charCtx.clearRect(0,0,charCanvas.width,charCanvas.height);
+  // 背景画像がある場合はbg範囲内にクリップ（吹き出し等が黒帯にはみ出さないよう）
+  if (bgImage) {
+    const _cW = charCanvas.width, _cH = charCanvas.height;
+    const _cScale = _cH / bgImage.height;
+    const _cDw = bgImage.width * _cScale;
+    const _cDx = (_cW - _cDw) / 2;
+    charCtx.save();
+    charCtx.beginPath();
+    charCtx.rect(_cDx, 0, _cDw, _cH);
+    charCtx.clip();
+  }
   // 1パス目：全キャラの本体を描画
   for(const c of characters){ c.draw(charCtx,charCanvas.width,charCanvas.height,false); }
   // 2パス目：全キャラのオーバーレイ（名前・吹き出し・ZZZ）を最前面に描画
   for(const c of characters){ c.draw(charCtx,charCanvas.width,charCanvas.height,true); }
+  if (bgImage) charCtx.restore();
 
   // ===== アナウンスバブル（動画開始前：大きな共有吹き出し）=====
   if (announcementState && announcementState.active) {
