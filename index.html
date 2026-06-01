@@ -559,12 +559,12 @@ const ANIMATIONS = {
   wave: {
     tSpeed: 5.0, moveMult: 0,
     fn: (t, d) => ({
-      head: Math.sin(t*2)*4*D, torso: 0,
-      leftArm:  12*D,
-      rightArm: -80*D + Math.sin(t*4)*22*D,
-      leftLeg:   Math.sin(t*0.5)*4*D*d,
-      rightLeg: -Math.sin(t*0.5)*4*D*d,
-      bob: 1,
+      head: Math.sin(t*3)*5*D, torso: 0,
+      leftArm:  -75*D + Math.sin(t*4)*20*D,
+      rightArm: -75*D + Math.sin(t*4 + Math.PI)*20*D,
+      leftLeg:   Math.sin(t*0.5)*3*D*d,
+      rightLeg: -Math.sin(t*0.5)*3*D*d,
+      bob: 2,
     }),
   },
   skip: {
@@ -639,7 +639,7 @@ const ANIMATIONS = {
     }),
   },
 };
-const ANIM_KEYS = Object.keys(ANIMATIONS);
+const ANIM_KEYS = Object.keys(ANIMATIONS).filter(k => k !== 'dance');
 
 // ======================================================
 // ===== 会話フレーズ =====
