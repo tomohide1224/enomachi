@@ -1591,7 +1591,7 @@ class Character {
         ctx.font = 'bold 22px sans-serif';   // 大きめフォント
         const pad = 16, th = 40;
         const tw  = ctx.measureText(text).width + pad * 2;
-        const bx  = this.x - tw / 2;
+        const bx = Math.max(window._bgXL||8, Math.min((window._bgXR||9999) - tw, this.x - tw / 2));
         const by  = hTopY - th - 20;
         // バブル本体
         ctx.fillStyle   = 'rgba(255,245,200,0.97)';
@@ -1801,22 +1801,13 @@ function loop(ts){
   }
 
   charCtx.clearRect(0,0,charCanvas.width,charCanvas.height);
-  // 背景画像がある場合はbg範囲内にクリップ（吹き出し等が黒帯にはみ出さないよう）
-  if (bgImage) {
-    const _cW = charCanvas.width, _cH = charCanvas.height;
-    const _cScale = _cH / bgImage.height;
-    const _cDw = bgImage.width * _cScale;
-    const _cDx = (_cW - _cDw) / 2;
-    charCtx.save();
-    charCtx.beginPath();
-    charCtx.rect(_cDx, 0, _cDw, _cH);
-    charCtx.clip();
-  }
+  // bg範囲計算（吹き出しクランプ用）→ window変数でdraw()からも参照可能
+  window._bgXL = bgImage ? (charCanvas.width - bgImage.width * (charCanvas.height / bgImage.height)) / 2 + 8 : 8;
+  window._bgXR = bgImage ? window._bgXL - 8 + bgImage.width * (charCanvas.height / bgImage.height) - 8 : charCanvas.width - 8;
   // 1パス目：全キャラの本体を描画
   for(const c of characters){ c.draw(charCtx,charCanvas.width,charCanvas.height,false); }
   // 2パス目：全キャラのオーバーレイ（名前・吹き出し・ZZZ）を最前面に描画
   for(const c of characters){ c.draw(charCtx,charCanvas.width,charCanvas.height,true); }
-  if (bgImage) charCtx.restore();
 
   // ===== アナウンスバブル（動画開始前：大きな共有吹き出し）=====
   if (announcementState && announcementState.active) {
