@@ -2115,6 +2115,7 @@ document.getElementById('qrToggleBtn').addEventListener('click', () => {
   sbClient.channel(`enomachi-${ROOM_ID}`)
     .on('broadcast', { event: 'new_character' }, async (payload) => {
       const { filePath } = payload.payload;
+      console.log('🎯 broadcast received:', filePath);
       if (filePath) await loadAndDisplayFile(filePath);
     })
     .subscribe((status) => {
