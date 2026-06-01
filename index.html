@@ -1128,7 +1128,7 @@ class Character {
         const _bs = _SH / bgImage.height;
         const _bw = bgImage.width * _bs;
         const _bdx = (_SW - _bw) / 2;
-        _xR = _bdx + _bw - 30;
+        _xR = _bdx + Math.round(_bw * 0.55);
       }
       this.x = _xR;
     }
