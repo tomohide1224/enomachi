@@ -1255,7 +1255,7 @@ class Character {
           const _bs = _SH / bgImage.height;
           const _bw = bgImage.width * _bs;
           const _bdx = (_SW - _bw) / 2;
-          _xL = _bdx + 70; _xR = _bdx + _bw - 70;
+          _xL = _bdx + 70; _xR = _bdx + _bw - 280;
         }
         if (this.x < _xL) this.x = _xL;
         if (this.x > _xR) this.x = _xR; }
@@ -1352,7 +1352,7 @@ class Character {
       const bgDw = bgImage.width * bgScale;
       const bgDx = (SW - bgDw) / 2;
       xLeft  = bgDx + 70;
-      xRight = bgDx + bgDw - 70;
+      xRight = bgDx + bgDw - 280;
     }
     if (this.x > xRight) { this.x = xRight; this.vx = -Math.abs(this.vx); }
     if (this.x < xLeft)  { this.x = xLeft;  this.vx =  Math.abs(this.vx); }
