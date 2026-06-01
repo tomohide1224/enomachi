@@ -1227,10 +1227,18 @@ class Character {
         const _yMax =  _SH * 0.10;
         if (this.y < _yMin) this.y = _yMin;
         if (this.y > _yMax) this.y = _yMax; }
-      // 左右壁
+      // 左右壁（背景画像がある場合はpillarboxの範囲に限定）
       { const _SW = window.innerWidth;
-        if (this.x < 30)       this.x = 30;
-        if (this.x > _SW - 30) this.x = _SW - 30; }
+        const _SH = window.innerHeight;
+        let _xL = 30, _xR = _SW - 30;
+        if (bgImage) {
+          const _bs = _SH / bgImage.height;
+          const _bw = bgImage.width * _bs;
+          const _bdx = (_SW - _bw) / 2;
+          _xL = _bdx + 30; _xR = _bdx + _bw - 30;
+        }
+        if (this.x < _xL) this.x = _xL;
+        if (this.x > _xR) this.x = _xR; }
       return;
     }
 
@@ -1317,9 +1325,17 @@ class Character {
     const SW = window.innerWidth;
     const SH = window.innerHeight;
 
-    // 左右の壁で反射
-    if (this.x > SW - 30) { this.x = SW - 30; this.vx = -Math.abs(this.vx); }
-    if (this.x < 30)      { this.x = 30;      this.vx =  Math.abs(this.vx); }
+    // 左右の壁で反射（背景画像がある場合はpillarboxの範囲に限定）
+    let xLeft = 30, xRight = SW - 30;
+    if (bgImage) {
+      const bgScale = SH / bgImage.height;
+      const bgDw = bgImage.width * bgScale;
+      const bgDx = (SW - bgDw) / 2;
+      xLeft  = bgDx + 30;
+      xRight = bgDx + bgDw - 30;
+    }
+    if (this.x > xRight) { this.x = xRight; this.vx = -Math.abs(this.vx); }
+    if (this.x < xLeft)  { this.x = xLeft;  this.vx =  Math.abs(this.vx); }
 
     // 上下の範囲で反射
     // ★ yMin：頭（身長分を引いた位置）が上部20%ラインを超えないよう計算
