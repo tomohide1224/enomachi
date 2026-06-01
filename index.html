@@ -546,7 +546,7 @@ const ANIMATIONS = {
     }),
   },
   dance: {
-    tSpeed: 6.0, moveMult: 0.4,
+    tSpeed: 6.0, moveMult: 0,
     fn: (t, d) => ({
       head: Math.sin(t*2)*6*D, torso: 0,
       leftArm:  -25*D + Math.sin(t*1.5)*18*D,
@@ -557,13 +557,13 @@ const ANIMATIONS = {
     }),
   },
   wave: {
-    tSpeed: 5.0, moveMult: 0.15,
+    tSpeed: 5.0, moveMult: 0,
     fn: (t, d) => ({
-      head: Math.sin(t*2)*5*D, torso: 0,
-      leftArm:  -38*D + Math.sin(t*3)*16*D,
-      rightArm:  8*D,
-      leftLeg:   Math.sin(t*0.5)*6*D*d,
-      rightLeg: -Math.sin(t*0.5)*6*D*d,
+      head: Math.sin(t*2)*4*D, torso: 0,
+      leftArm:  12*D,
+      rightArm: -80*D + Math.sin(t*4)*22*D,
+      leftLeg:   Math.sin(t*0.5)*4*D*d,
+      rightLeg: -Math.sin(t*0.5)*4*D*d,
       bob: 1,
     }),
   },
@@ -1956,8 +1956,11 @@ async function processCharacterFile(file, silent = false) {
       // Base64URL → Base64 → デコード
       const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
       const b64padded = b64 + '==='.slice(0, (4 - b64.length % 4) % 4);
-      const decoded = decodeURIComponent(atob(b64padded));
-      if (decoded) name = decoded;
+      const atobResult1 = atob(b64padded);
+      if (/^[\x20-\x7E]+$/.test(atobResult1)) {
+        const decoded = decodeURIComponent(atobResult1);
+        if (decoded) name = decoded;
+      }
     }
   } catch(e) {
     // デコード失敗時はrawNameをそのまま使用
@@ -2139,8 +2142,11 @@ async function addProcessedCharacter(file, filePath = null) {
     if (lastUnder > 0) {
       const b64 = rawName.substring(0, lastUnder).replace(/-/g, '+').replace(/_/g, '/');
       const b64padded = b64 + '==='.slice(0, (4 - b64.length % 4) % 4);
-      const decoded = decodeURIComponent(atob(b64padded));
-      if (decoded) name = decoded;
+      const atobResult2 = atob(b64padded);
+      if (/^[\x20-\x7E]+$/.test(atobResult2)) {
+        const decoded = decodeURIComponent(atobResult2);
+        if (decoded) name = decoded;
+      }
     }
   } catch(e) { name = rawName; }
 
