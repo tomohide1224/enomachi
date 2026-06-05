@@ -557,13 +557,12 @@ const ANIMATIONS = {
     }),
   },
   wave: {
-    tSpeed: 5.0, moveMult: 0,
+    tSpeed: 7.0, moveMult: 0,
     fn: (t, d) => ({
-      head: Math.sin(t*3)*5*D, torso: 0,
-      leftArm:  -75*D + Math.sin(t*4)*20*D,
-      rightArm: -75*D + Math.sin(t*4 + Math.PI)*20*D,
-      leftLeg:   Math.sin(t*0.5)*3*D*d,
-      rightLeg: -Math.sin(t*0.5)*3*D*d,
+      head: Math.sin(t*4)*5*D, torso: 0,
+      leftArm:  -45*D + Math.sin(t*6)*18*D,
+      rightArm:  45*D - Math.sin(t*6)*18*D,
+      leftLeg:   0, rightLeg: 0,
       bob: 2,
     }),
   },
