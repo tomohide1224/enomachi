@@ -11,7 +11,7 @@
   <!-- QRコード生成 -->
   <!-- QRコード：外部APIで生成（ライブラリ不要） -->
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * { margin:0; padding:0; box-sizing:border-box; 
     body { background:#000; overflow:hidden; }
     #screen { width:100vw; height:100vh; position:relative; }
     #bgCanvas  { position:absolute; inset:0; width:100%; height:100%; }
@@ -560,8 +560,8 @@ const ANIMATIONS = {
     tSpeed: 7.0, moveMult: 0,
     fn: (t, d) => ({
       head: Math.sin(t*4)*5*D, torso: 0,
-      leftArm:  -45*D + Math.sin(t*6)*18*D,
-      rightArm:  45*D + Math.sin(t*6)*18*D,
+      leftArm:  -50*D + Math.sin(t*6)*18*D,
+      rightArm:  -50*D + Math.sin(t*6)*18*D,
       leftLeg:   0, rightLeg: 0,
       bob: 2,
     }),
