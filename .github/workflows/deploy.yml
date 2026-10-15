@@ -12,13 +12,12 @@ jobs:
       contents: read
       deployments: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: a16a5431658f2234c5c5ed50c81e85bf
-          projectName: enomachi
-          directory: .
+          command: pages deploy . --project-name=enomachi --branch=main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
