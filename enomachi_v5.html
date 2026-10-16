@@ -129,15 +129,19 @@
     /* ===== オープニング動画オーバーレイ ===== */
     #openingOverlay {
       position:fixed; inset:0; z-index:999;
-      background:#000;
+      background:#fff;  /* [v5] 動画の左右の余白は白 */
       display:flex; align-items:center; justify-content:center;
       transition:opacity 0.8s ease;
     }
     #openingOverlay.fadeout { opacity:0; pointer-events:none; }
     #openingVideo {
-      position:absolute; inset:0;
-      width:100%; height:100%;
-      object-fit:cover;
+      /* [v5] 高さを画面に合わせ、横は比率どおりに中央配置（町の背景と同じ見せ方） */
+      position:absolute; top:0; left:50%;
+      transform:translateX(-50%);
+      height:100%; width:auto; max-width:none;
+      aspect-ratio:16 / 9;
+      object-fit:contain;
+      background:#fff;
       display:none;
     }
     /* タップしてはじめる スタート画面 */
@@ -268,6 +272,7 @@
 //   ✅ [v4] オープニング動画は2本を交互に再生：経堂由来 → 町 → 経堂駅周辺の白黒 → 町 → 経堂由来 …
 //   ✅ [v5] 背景画像は高さを画面に合わせ、横は比率どおりに中央配置（余白は白）
 //   ✅ [v5] キャラクターは背景画像の横幅の範囲内だけを移動（stageBounds()）
+//   ✅ [v5] オープニング動画も高さを画面に合わせ、横は比率どおりに中央配置（余白は白）
 //   ✅ インターバルタイマー（デフォルト3分）で自動再生
 //   ✅ タイマー起動前3秒：キャラが徐々に一列に集合（gatherTarget操舵）
 //   ✅ 集合後2.5秒：「動画がはじまるよーー！」大吹き出し（画面中央やや上）
