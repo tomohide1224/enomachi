@@ -282,6 +282,7 @@
 //   ✅ 受信した写真のURL（createObjectURL）は読み込み後に必ず revoke
 //   ✅ 退場・除去したキャラは dispose() でパーツ画像を解放（removeCharacterAt）
 //   ✅ 読み込み済みファイル名の記録は最新 LOADED_NAMES_MAX 件だけ保持
+//   ✅ スタッフ用QRは upload_v2.html（名前必須）を開く
 //   ✅ インターバルタイマー（デフォルト3分）で自動再生
 //   ✅ タイマー起動前3秒：キャラが徐々に一列に集合（gatherTarget操舵）
 //   ✅ 集合後2.5秒：「動画がはじまるよーー！」大吹き出し（画面中央やや上）
@@ -2123,7 +2124,7 @@ document.getElementById('roomIdDisplay').textContent = ROOM_ID;
 
 // QRコード生成（外部API使用、ライブラリ不要）
 (function generateQR() {
-  const uploadUrl = `${location.origin}/upload.html?room=${ROOM_ID}`;
+  const uploadUrl = `${location.origin}/upload_v2.html?room=${ROOM_ID}`;  // [v6] 名前必須の登録画面
   const el = document.getElementById('qrCanvas');
   if (el) {
     const img = document.createElement('img');
